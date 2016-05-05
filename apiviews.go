@@ -1,8 +1,7 @@
 package niuhe
 
 import (
-	//"fmt"
-	"code.ziipin.com/ziipin-server/zpform"
+	"github.com/ziipin-server/zpform"
 	"github.com/gin-gonic/gin"
 	"reflect"
 	"regexp"
