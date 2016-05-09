@@ -8,14 +8,14 @@ import (
 	"strings"
 )
 
-type _Methods enum {
-	GET,
-	POST,
-	GET_POST,
+const (
+	GET int = 1
+	POST int = 2
+	GET_POST int = 3
 }
 
 type routeInfo struct {
-	Methods    _Methods
+	Methods    int
 	Path       string
 	handleFunc gin.HandlerFunc
 }
@@ -70,7 +70,7 @@ func (mod *Module) Register(group interface{}) *Module {
 
 var bindFunc reflect.Value
 
-func (mod *Module) _Register(methods, Methods, path string, funcValue reflect.Value) *Module {
+func (mod *Module) _Register(methods int, path string, funcValue reflect.Value) *Module {
 	funcType := funcValue.Type()
 	if funcType.Kind() != reflect.Func {
 		panic("handleFunc必须为函数")
