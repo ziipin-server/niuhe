@@ -62,7 +62,7 @@ func (mod *Module) Register(group interface{}) *Module {
 		} else {
 			methods = GET_POST
 		}
-		path := strings.ToLower("/" + parseName(groupName) + "/" + parseName(m.Name) + "/")
+		path := strings.ToLower("/" + parseName(groupName) + "/" + parseName(name) + "/")
 		mod._Register(methods, path, m.Func)
 	}
 	return mod
