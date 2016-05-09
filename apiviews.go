@@ -52,7 +52,7 @@ func (mod *Module) Register(group interface{}) *Module {
 	for i := 0; i < groupType.NumMethod(); i++ {
 		m := groupType.Method(i)
 		name := m.Name
-		var methods _Methods
+		var methods int
 		if strings.HasSuffix(name, "_GET") {
 			methods = GET
 			name = name[:len(name)-len("_GET")]
