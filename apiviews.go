@@ -8,7 +8,14 @@ import (
 	"strings"
 )
 
+type _Methods enum {
+	GET,
+	POST,
+	GET_POST,
+}
+
 type routeInfo struct {
+	Methods    _Methods
 	Path       string
 	handleFunc gin.HandlerFunc
 }
@@ -44,15 +51,24 @@ func (mod *Module) Register(group interface{}) *Module {
 	groupName := groupType.Elem().Name()
 	for i := 0; i < groupType.NumMethod(); i++ {
 		m := groupType.Method(i)
+		name := m.Name
+		var methods _Methods
+		if strings.HasSuffix(name, "_GET") {
+			methods = GET
+		} else if strings.HasSuffix(name, "_POST") {
+			methods = POST
+		} else {
+			methods = GET_POST
+		}
 		path := strings.ToLower("/" + parseName(groupName) + "/" + parseName(m.Name) + "/")
-		mod._Register(path, m.Func)
+		mod._Register(methods, path, m.Func)
 	}
 	return mod
 }
 
 var bindFunc reflect.Value
 
-func (mod *Module) _Register(path string, funcValue reflect.Value) *Module {
+func (mod *Module) _Register(methods, Methods, path string, funcValue reflect.Value) *Module {
 	funcType := funcValue.Type()
 	if funcType.Kind() != reflect.Func {
 		panic("handleFunc必须为函数")
@@ -105,7 +121,7 @@ func (mod *Module) _Register(path string, funcValue reflect.Value) *Module {
 			})
 		}
 	}
-	mod.handlers = append(mod.handlers, routeInfo{Path: path, handleFunc: ginHandler})
+	mod.handlers = append(mod.handlers, routeInfo{Methods: methods, Path: path, handleFunc: ginHandler})
 	return mod
 }
 

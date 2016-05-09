@@ -23,8 +23,12 @@ func (svr *Server) Serve(addr string) {
 	for _, mod := range svr.modules {
 		group := gin.Group(mod.urlPrefix)
 		for _, info := range mod.handlers {
-			group.GET(info.Path, info.handleFunc)
-			group.POST(info.Path, info.handleFunc)
+			if info.Methods & GET {
+				group.GET(info.Path, info.handleFunc)
+			}
+			if info.Methods & POST {
+				group.POST(info.Path, info.handleFunc)
+			}
 		}
 	}
 	gin.Run(addr)
