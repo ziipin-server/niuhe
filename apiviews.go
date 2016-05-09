@@ -55,8 +55,10 @@ func (mod *Module) Register(group interface{}) *Module {
 		var methods _Methods
 		if strings.HasSuffix(name, "_GET") {
 			methods = GET
+			name = name[:len(name) - len("_GET")]
 		} else if strings.HasSuffix(name, "_POST") {
 			methods = POST
+			name = name[:len(name) - len("_POST")]
 		} else {
 			methods = GET_POST
 		}
