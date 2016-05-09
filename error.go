@@ -9,13 +9,13 @@ type ICommError interface {
 
 type CommError struct {
 	error
-	Code int
+	Code    int
 	Message string
 }
 
 func NewCommError(code int, message string) *CommError {
-	return &CommError {
-		Code: code,
+	return &CommError{
+		Code:    code,
 		Message: message,
 	}
 }

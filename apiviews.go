@@ -1,18 +1,18 @@
 package niuhe
 
 import (
-	"github.com/ziipin-server/zpform"
 	"github.com/gin-gonic/gin"
+	"github.com/ziipin-server/zpform"
 	"reflect"
 	"regexp"
 	"strings"
 )
 
 const (
-	GET int = 1
-	POST int = 2
+	GET      int = 1
+	POST     int = 2
 	GET_POST int = 3
-}
+)
 
 type routeInfo struct {
 	Methods    int
@@ -55,10 +55,10 @@ func (mod *Module) Register(group interface{}) *Module {
 		var methods _Methods
 		if strings.HasSuffix(name, "_GET") {
 			methods = GET
-			name = name[:len(name) - len("_GET")]
+			name = name[:len(name)-len("_GET")]
 		} else if strings.HasSuffix(name, "_POST") {
 			methods = POST
-			name = name[:len(name) - len("_POST")]
+			name = name[:len(name)-len("_POST")]
 		} else {
 			methods = GET_POST
 		}
