@@ -26,6 +26,7 @@ func TestIntConstGroup(t *testing.T) {
 		t.Error("GetName error, returns " + LangEnum.GetName(LangEnum.ZH_CN.Value))
 		return
 	}
+	fmt.Println(LangEnum.GetChoices())
 }
 
 

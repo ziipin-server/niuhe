@@ -6,6 +6,7 @@ import (
 
 type Server struct {
 	modules []*Module
+	engine *gin.Engine
 }
 
 func NewServer() *Server {
@@ -19,17 +20,23 @@ func (svr *Server) RegisterModule(mod *Module) {
 }
 
 func (svr *Server) Serve(addr string) {
-	gin := gin.New()
-	for _, mod := range svr.modules {
-		group := gin.Group(mod.urlPrefix)
-		for _, info := range mod.handlers {
-			if (info.Methods & GET) != 0 {
-				group.GET(info.Path, info.handleFunc)
-			}
-			if (info.Methods & POST) != 0 {
-				group.POST(info.Path, info.handleFunc)
+	svr.GetGinEngine().Run(addr)
+}
+
+func (svr *Server) GetGinEngine() *gin.Engine {
+	if svr.engine == nil {
+		svr.engine = gin.New()
+		for _, mod := range svr.modules {
+			group := svr.engine.Group(mod.urlPrefix)
+			for _, info := range mod.handlers {
+				if (info.Methods & GET) != 0 {
+					group.GET(info.Path, info.handleFunc)
+				}
+				if (info.Methods & POST) != 0 {
+					group.POST(info.Path, info.handleFunc)
+				}
 			}
 		}
 	}
-	gin.Run(addr)
+	return svr.engine
 }

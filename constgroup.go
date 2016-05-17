@@ -57,3 +57,11 @@ func (g *IntConstGroup) MustGetName(value int) string {
 	}
 	return name
 }
+
+func (g *IntConstGroup) GetChoices() map[int]string {
+	r := make(map[int]string)
+	for k, v := range g.items {
+		r[k] = v
+	}
+	return r
+}
