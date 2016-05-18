@@ -25,7 +25,7 @@ func (svr *Server) Serve(addr string) {
 
 func (svr *Server) GetGinEngine() *gin.Engine {
 	if svr.engine == nil {
-		svr.engine = gin.New()
+		svr.engine = gin.Default()
 		for _, mod := range svr.modules {
 			group := svr.engine.Group(mod.urlPrefix)
 			for _, info := range mod.handlers {
