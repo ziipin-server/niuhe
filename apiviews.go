@@ -70,6 +70,61 @@ func (mod *Module) Register(group interface{}) *Module {
 
 var bindFunc reflect.Value
 
+func getApiGinFunc(nilGroupValue, funcValue reflect.Value, reqType, rspType reflect.Type) func(*gin.Context) {
+	return func(c *gin.Context) {
+		req := reflect.New(reqType)
+		rsp := reflect.New(rspType)
+		var ierr interface{}
+		if formErr := zpform.ReadReflectedStructForm(c.Request, req); formErr != nil {
+			ierr = formErr
+		}
+		if ierr == nil {
+			outs := funcValue.Call([]reflect.Value{
+				nilGroupValue,
+				reflect.ValueOf(newContext(c)),
+				req,
+				rsp,
+			})
+			ierr = outs[0].Interface()
+		}
+		var response map[string]interface{}
+		if ierr != nil {
+			commErr, ok := ierr.(ICommError)
+			if ok {
+				response = map[string]interface{}{
+					"result":  commErr.GetCode(),
+					"message": commErr.GetMessage(),
+				}
+			} else if err, ok := ierr.(error); ok {
+				response = map[string]interface{}{
+					"result":  -1,
+					"message": err.Error(),
+				}
+			} else {
+				response = map[string]interface{}{
+					"result":  -1,
+					"message": "Unknown",
+				}
+			}
+		} else {
+			response = map[string]interface{}{
+				"result": 0,
+				"data":   rsp.Interface(),
+			}
+		}
+		c.JSON(200, response)
+	}
+}
+
+func getWebGinFunc(nilGroupValue, funcValue reflect.Value) func(*gin.Context) {
+	return func(c *gin.Context) {
+		funcValue.Call([]reflect.Value{
+			nilGroupValue,
+			reflect.ValueOf(newContext(c)),
+		})
+	}
+}
+
 func (mod *Module) _Register(methods int, path string, funcValue reflect.Value) *Module {
 	funcType := funcValue.Type()
 	if funcType.Kind() != reflect.Func {
@@ -88,55 +143,10 @@ func (mod *Module) _Register(methods int, path string, funcValue reflect.Value) 
 	if isApi {
 		reqType := funcType.In(2).Elem()
 		rspType := funcType.In(3).Elem()
-		ginHandler := func(c *gin.Context) {
-			req := reflect.New(reqType)
-			rsp := reflect.New(rspType)
-			var ierr interface{}
-			if formErr := zpform.ReadReflectedStructForm(c.Request, req); formErr != nil {
-				ierr = formErr
-			}
-			if ierr == nil {
-				outs := funcValue.Call([]reflect.Value{
-					nilGroupValue,
-					reflect.ValueOf(newContext(c)),
-					req,
-					rsp,
-				})
-				ierr = outs[0].Interface()
-			}
-			if ierr != nil {
-				commErr, ok := ierr.(ICommError)
-				if ok {
-					c.JSON(200, map[string]interface{}{
-						"result":  commErr.GetCode(),
-						"message": commErr.GetMessage(),
-					})
-				} else if err, ok := ierr.(error); ok {
-					c.JSON(200, map[string]interface{}{
-						"result":  -1,
-						"message": err.Error(),
-					})
-				} else {
-					c.JSON(200, map[string]interface{}{
-						"result":  -1,
-						"message": "Unknown",
-					})
-				}
-			} else {
-				c.JSON(200, map[string]interface{}{
-					"result": 0,
-					"data":   rsp.Interface(),
-				})
-			}
-		}
+		ginHandler := getApiGinFunc(nilGroupValue, funcValue, reqType, rspType)
 		mod.handlers = append(mod.handlers, routeInfo{Methods: methods, Path: path, handleFunc: ginHandler})
 	} else {
-		ginHandler := func(c *gin.Context) {
-			funcValue.Call([]reflect.Value{
-				nilGroupValue,
-				reflect.ValueOf(newContext(c)),
-			})
-		}
+		ginHandler := getWebGinFunc(nilGroupValue, funcValue)
 		mod.handlers = append(mod.handlers, routeInfo{Methods: methods, Path: path, handleFunc: ginHandler})
 	}
 	return mod
