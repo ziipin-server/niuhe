@@ -2,6 +2,7 @@ package niuhe
 
 import (
 	"github.com/gin-gonic/gin"
+	"os"
 )
 
 type Server struct {
@@ -25,7 +26,8 @@ func (svr *Server) Serve(addr string) {
 
 func (svr *Server) GetGinEngine() *gin.Engine {
 	if svr.engine == nil {
-		svr.engine = gin.Default()
+		svr.engine = gin.New()
+		svr.engine.Use(gin.LoggerWithWriter(os.Stderr), gin.Recovery())
 		for _, mod := range svr.modules {
 			group := svr.engine.Group(mod.urlPrefix)
 			for _, info := range mod.handlers {

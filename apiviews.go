@@ -75,55 +75,70 @@ func (mod *Module) _Register(methods int, path string, funcValue reflect.Value) 
 	if funcType.Kind() != reflect.Func {
 		panic("handleFunc必须为函数")
 	}
-	if funcType.NumIn() != 4 || funcType.NumOut() != 1 {
+	var isApi bool
+	if funcType.NumIn() == 4 && funcType.NumOut() == 1 {
+		isApi = true
+	} else if funcType.NumIn() == 2 && funcType.NumOut() == 0 {
+		isApi = false
+	} else {
 		panic("handleFunc必须有三个参数,并且只返回一个error")
 	}
 	groupType := funcType.In(0)
 	nilGroupValue := reflect.Zero(groupType)
-	reqType := funcType.In(2).Elem()
-	rspType := funcType.In(3).Elem()
-	ginHandler := func(c *gin.Context) {
-		req := reflect.New(reqType)
-		rsp := reflect.New(rspType)
-		var ierr interface{}
-		if formErr := zpform.ReadReflectedStructForm(c.Request, req); formErr != nil {
-			ierr = formErr
-		}
-		if ierr == nil {
-			outs := funcValue.Call([]reflect.Value{
-				nilGroupValue,
-				reflect.ValueOf(newContext(c)),
-				req,
-				rsp,
-			})
-			ierr = outs[0].Interface()
-		}
-		if ierr != nil {
-			commErr, ok := ierr.(ICommError)
-			if ok {
-				c.JSON(200, map[string]interface{}{
-					"result":  commErr.GetCode(),
-					"message": commErr.GetMessage(),
+	if isApi {
+		reqType := funcType.In(2).Elem()
+		rspType := funcType.In(3).Elem()
+		ginHandler := func(c *gin.Context) {
+			req := reflect.New(reqType)
+			rsp := reflect.New(rspType)
+			var ierr interface{}
+			if formErr := zpform.ReadReflectedStructForm(c.Request, req); formErr != nil {
+				ierr = formErr
+			}
+			if ierr == nil {
+				outs := funcValue.Call([]reflect.Value{
+					nilGroupValue,
+					reflect.ValueOf(newContext(c)),
+					req,
+					rsp,
 				})
-			} else if err, ok := ierr.(error); ok {
-				c.JSON(200, map[string]interface{}{
-					"result":  -1,
-					"message": err.Error(),
-				})
+				ierr = outs[0].Interface()
+			}
+			if ierr != nil {
+				commErr, ok := ierr.(ICommError)
+				if ok {
+					c.JSON(200, map[string]interface{}{
+						"result":  commErr.GetCode(),
+						"message": commErr.GetMessage(),
+					})
+				} else if err, ok := ierr.(error); ok {
+					c.JSON(200, map[string]interface{}{
+						"result":  -1,
+						"message": err.Error(),
+					})
+				} else {
+					c.JSON(200, map[string]interface{}{
+						"result":  -1,
+						"message": "Unknown",
+					})
+				}
 			} else {
 				c.JSON(200, map[string]interface{}{
-					"result":  -1,
-					"message": "Unknown",
+					"result": 0,
+					"data":   rsp.Interface(),
 				})
 			}
-		} else {
-			c.JSON(200, map[string]interface{}{
-				"result": 0,
-				"data":   rsp.Interface(),
+		}
+		mod.handlers = append(mod.handlers, routeInfo{Methods: methods, Path: path, handleFunc: ginHandler})
+	} else {
+		ginHandler := func(c *gin.Context) {
+			funcValue.Call([]reflect.Value{
+				nilGroupValue,
+				reflect.ValueOf(newContext(c)),
 			})
 		}
+		mod.handlers = append(mod.handlers, routeInfo{Methods: methods, Path: path, handleFunc: ginHandler})
 	}
-	mod.handlers = append(mod.handlers, routeInfo{Methods: methods, Path: path, handleFunc: ginHandler})
 	return mod
 }
 
