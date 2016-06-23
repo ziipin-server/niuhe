@@ -9,15 +9,22 @@ import (
 )
 
 type Server struct {
-	PathPrefix string
-	modules    []*Module
-	engine     *gin.Engine
+	PathPrefix  string
+	engine      *gin.Engine
+	modules     []*Module
+	middlewares []gin.HandlerFunc
 }
 
 func NewServer() *Server {
 	return &Server{
-		modules: make([]*Module, 0),
+		modules:     make([]*Module, 0),
+		middlewares: make([]gin.HandlerFunc, 0),
 	}
+}
+
+func (svr *Server) Use(middlewares ...gin.HandlerFunc) *Server {
+	svr.middlewares = append(svr.middlewares, middlewares...)
+	return svr
 }
 
 func (svr *Server) SetPathPrefix(prefix string) {
@@ -40,7 +47,8 @@ func (svr *Server) Serve(addr string) {
 func (svr *Server) GetGinEngine() *gin.Engine {
 	if svr.engine == nil {
 		svr.engine = gin.New()
-		svr.engine.Use(gin.LoggerWithWriter(os.Stderr), gin.Recovery())
+		svr.engine.Use(gin.LoggerWithWriter(os.Stderr), gin.Recovery()).
+			Use(svr.middlewares...)
 		for _, mod := range svr.modules {
 			group := svr.engine.Group(svr.PathPrefix + mod.urlPrefix)
 			for _, info := range mod.handlers {
