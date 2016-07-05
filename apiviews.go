@@ -78,7 +78,10 @@ type IApiProtocol interface {
 type DefaultApiProtocol struct{}
 
 func (self DefaultApiProtocol) Read(request *http.Request, reqValue reflect.Value) error {
-	return zpform.ReadReflectedStructForm(request, reqValue)
+	if err := zpform.ReadReflectedStructForm(request, reqValue); err != nil {
+		return NewCommError(-1, err.Error())
+	}
+	return nil
 }
 
 func (self DefaultApiProtocol) Write(c *Context, rsp reflect.Value, err error) error {
@@ -118,11 +121,22 @@ func (f ApiProtocolFactoryFunc) GetProtocol() IApiProtocol {
 var defaultApiProtocol *DefaultApiProtocol
 
 func GetDefaultApiProtocol() IApiProtocol {
+	LogDebug("GetDefaultApiProtocol")
 	return defaultApiProtocol
 }
 
+var defaultApiProtocolFactory IApiProtocolFactory
+
+func GetDefaultProtocolFactory() IApiProtocolFactory {
+	return defaultApiProtocolFactory
+}
+
+func SetDefaultProtocolFactory(pf IApiProtocolFactory) {
+	defaultApiProtocolFactory = pf
+}
+
 func (mod *Module) Register(group interface{}, middlewares ...HandlerFunc) *Module {
-	return mod.RegisterWithProtocolFactory(group, ApiProtocolFactoryFunc(GetDefaultApiProtocol), middlewares...)
+	return mod.RegisterWithProtocolFactory(group, nil, middlewares...)
 }
 
 func (mod *Module) RegisterWithProtocolFactoryFunc(group interface{}, pff func() IApiProtocol, middlewares ...HandlerFunc) *Module {
@@ -158,7 +172,12 @@ func getApiGinFunc(nilGroupValue, funcValue reflect.Value, reqType, rspType refl
 		req := reflect.New(reqType)
 		rsp := reflect.New(rspType)
 		var ierr interface{}
-		protocol := pf.GetProtocol()
+		var protocol IApiProtocol
+		if pf == nil {
+			protocol = GetDefaultProtocolFactory().GetProtocol()
+		} else {
+			protocol = pf.GetProtocol()
+		}
 		if formErr := protocol.Read(c.Request, req); formErr != nil {
 			ierr = formErr
 		}
@@ -240,4 +259,5 @@ func init() {
 	}
 	bindFunc = bindMethod.Func
 	defaultApiProtocol = &DefaultApiProtocol{}
+	defaultApiProtocolFactory = ApiProtocolFactoryFunc(GetDefaultApiProtocol)
 }
