@@ -47,13 +47,13 @@ func (mod *Module) Use(middlewares ...HandlerFunc) *Module {
 }
 
 type Context struct {
-	gin.Context
+	*gin.Context
 	index    int8
 	handlers []HandlerFunc
 }
 
 func newContext(c *gin.Context, middlewares []HandlerFunc) *Context {
-	return &Context{Context: *c, index: -1, handlers: middlewares}
+	return &Context{Context: c, index: -1, handlers: middlewares}
 }
 
 func (c *Context) Next() {
