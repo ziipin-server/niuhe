@@ -3,12 +3,12 @@ package niuhe
 import "fmt"
 
 type ICommError interface {
+	error
 	GetCode() int
 	GetMessage() string
 }
 
 type CommError struct {
-	error
 	Code    int
 	Message string
 }
