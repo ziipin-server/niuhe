@@ -143,24 +143,32 @@ func (mod *Module) RegisterWithProtocolFactoryFunc(group interface{}, pff func()
 	return mod.RegisterWithProtocolFactory(group, ApiProtocolFactoryFunc(pff), middlewares...)
 }
 
+type IModuleGroup interface {
+	Register(*Module, pf IApiProtocolFactory, middlewares ...HandlerFunc)
+}
+
 func (mod *Module) RegisterWithProtocolFactory(group interface{}, pf IApiProtocolFactory, middlewares ...HandlerFunc) *Module {
-	groupType := reflect.TypeOf(group)
-	groupName := groupType.Elem().Name()
-	for i := 0; i < groupType.NumMethod(); i++ {
-		m := groupType.Method(i)
-		name := m.Name
-		var methods int
-		if strings.HasSuffix(name, "_GET") {
-			methods = GET
-			name = name[:len(name)-len("_GET")]
-		} else if strings.HasSuffix(name, "_POST") {
-			methods = POST
-			name = name[:len(name)-len("_POST")]
-		} else {
-			methods = GET_POST
+	if modGroup, ok := group.(IModuleGroup); ok {
+		modGroup.Register(mod, pf, middlewares...)
+	} else {
+		groupType := reflect.TypeOf(group)
+		groupName := groupType.Elem().Name()
+		for i := 0; i < groupType.NumMethod(); i++ {
+			m := groupType.Method(i)
+			name := m.Name
+			var methods int
+			if strings.HasSuffix(name, "_GET") {
+				methods = GET
+				name = name[:len(name)-len("_GET")]
+			} else if strings.HasSuffix(name, "_POST") {
+				methods = POST
+				name = name[:len(name)-len("_POST")]
+			} else {
+				methods = GET_POST
+			}
+			path := strings.ToLower("/" + parseName(groupName) + "/" + parseName(name) + "/")
+			mod._Register(methods, path, m.Func, pf, middlewares)
 		}
-		path := strings.ToLower("/" + parseName(groupName) + "/" + parseName(name) + "/")
-		mod._Register(methods, path, m.Func, pf, middlewares)
 	}
 	return mod
 }
