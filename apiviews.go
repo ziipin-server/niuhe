@@ -144,7 +144,7 @@ func (mod *Module) RegisterWithProtocolFactoryFunc(group interface{}, pff func()
 }
 
 type IModuleGroup interface {
-	Register(*Module, pf IApiProtocolFactory, middlewares ...HandlerFunc)
+	Register(*Module, IApiProtocolFactory, ...HandlerFunc)
 }
 
 func (mod *Module) RegisterWithProtocolFactory(group interface{}, pf IApiProtocolFactory, middlewares ...HandlerFunc) *Module {
@@ -153,6 +153,7 @@ func (mod *Module) RegisterWithProtocolFactory(group interface{}, pf IApiProtoco
 	} else {
 		groupType := reflect.TypeOf(group)
 		groupName := groupType.Elem().Name()
+		groupValue := reflect.ValueOf(group)
 		for i := 0; i < groupType.NumMethod(); i++ {
 			m := groupType.Method(i)
 			name := m.Name
@@ -167,7 +168,7 @@ func (mod *Module) RegisterWithProtocolFactory(group interface{}, pf IApiProtoco
 				methods = GET_POST
 			}
 			path := strings.ToLower("/" + parseName(groupName) + "/" + parseName(name) + "/")
-			mod._Register(methods, path, m.Func, pf, middlewares)
+			mod._Register(groupValue, methods, path, m.Func, pf, middlewares)
 		}
 	}
 	return mod
@@ -175,7 +176,7 @@ func (mod *Module) RegisterWithProtocolFactory(group interface{}, pf IApiProtoco
 
 var bindFunc reflect.Value
 
-func getApiGinFunc(nilGroupValue, funcValue reflect.Value, reqType, rspType reflect.Type, pf IApiProtocolFactory, middlewares []HandlerFunc) func(*gin.Context) {
+func getApiGinFunc(groupValue, funcValue reflect.Value, reqType, rspType reflect.Type, pf IApiProtocolFactory, middlewares []HandlerFunc) func(*gin.Context) {
 	return func(c *gin.Context) {
 		req := reflect.New(reqType)
 		rsp := reflect.New(rspType)
@@ -193,7 +194,7 @@ func getApiGinFunc(nilGroupValue, funcValue reflect.Value, reqType, rspType refl
 		if ierr == nil {
 			context.handlers = append(context.handlers, func(c *Context) {
 				outs := funcValue.Call([]reflect.Value{
-					nilGroupValue,
+					groupValue,
 					reflect.ValueOf(context),
 					req,
 					rsp,
@@ -218,12 +219,12 @@ func getApiGinFunc(nilGroupValue, funcValue reflect.Value, reqType, rspType refl
 	}
 }
 
-func getWebGinFunc(nilGroupValue, funcValue reflect.Value, middlewares []HandlerFunc) func(*gin.Context) {
+func getWebGinFunc(groupValue, funcValue reflect.Value, middlewares []HandlerFunc) func(*gin.Context) {
 	return func(c *gin.Context) {
 		context := newContext(c, middlewares)
 		context.handlers = append(context.handlers, func(c *Context) {
 			funcValue.Call([]reflect.Value{
-				nilGroupValue,
+				groupValue,
 				reflect.ValueOf(context),
 			})
 		})
@@ -231,7 +232,7 @@ func getWebGinFunc(nilGroupValue, funcValue reflect.Value, middlewares []Handler
 	}
 }
 
-func (mod *Module) _Register(methods int, path string, funcValue reflect.Value, pf IApiProtocolFactory, middlewares []HandlerFunc) *Module {
+func (mod *Module) _Register(groupValue reflect.Value, methods int, path string, funcValue reflect.Value, pf IApiProtocolFactory, middlewares []HandlerFunc) *Module {
 	funcType := funcValue.Type()
 	if funcType.Kind() != reflect.Func {
 		panic("handleFunc必须为函数")
@@ -244,16 +245,14 @@ func (mod *Module) _Register(methods int, path string, funcValue reflect.Value, 
 	} else {
 		panic("handleFunc必须有三个参数,并且只返回一个error")
 	}
-	groupType := funcType.In(0)
-	nilGroupValue := reflect.Zero(groupType)
 	middlewares = append(mod.middlewares, middlewares...)
 	if isApi {
 		reqType := funcType.In(2).Elem()
 		rspType := funcType.In(3).Elem()
-		ginHandler := getApiGinFunc(nilGroupValue, funcValue, reqType, rspType, pf, middlewares)
+		ginHandler := getApiGinFunc(groupValue, funcValue, reqType, rspType, pf, middlewares)
 		mod.handlers = append(mod.handlers, routeInfo{Methods: methods, Path: path, handleFunc: ginHandler})
 	} else {
-		ginHandler := getWebGinFunc(nilGroupValue, funcValue, middlewares)
+		ginHandler := getWebGinFunc(groupValue, funcValue, middlewares)
 		mod.handlers = append(mod.handlers, routeInfo{Methods: methods, Path: path, handleFunc: ginHandler})
 	}
 	return mod
