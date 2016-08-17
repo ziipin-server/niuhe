@@ -64,6 +64,10 @@ func (c *Context) Next() {
 	}
 }
 
+func (c *Context) Abort() {
+	c.index = abortIndex
+}
+
 func parseName(camelName string) string {
 	re := regexp.MustCompile("[A-Z][a-z0-9]*")
 	parts := re.FindAllString(camelName, -1)
