@@ -216,7 +216,7 @@ func (ctrl *AdminCrudViewCtrl) ApplyFilterList(c *niuhe.Context, session *xorm.S
 	}
 }
 
-func (ctrl *AdminCrudViewCtrl) GetPage(c *niuhe.Context) (outPage int, outPageSize int, outTotal int, outRows interface{}, err error) {
+func (ctrl *AdminCrudViewCtrl) GetPage(c *niuhe.Context) (outPage int, outPageSize int, outTotal int, outRows []map[string]interface{}, err error) {
 	outPage = 1
 	outPageSize = 10
 	if s, find := c.GetQuery("page"); find {
@@ -256,7 +256,7 @@ func (ctrl *AdminCrudViewCtrl) GetPage(c *niuhe.Context) (outPage int, outPageSi
 	} else {
 		outRows = pipe.NewPipe(mSlicePtr.Elem().Interface()).
 			Map(ctrl.ToRow).
-			ToSlice()
+			ToSlice().([]map[string]interface{})
 	}
 	return
 }
