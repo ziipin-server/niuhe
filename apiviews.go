@@ -161,6 +161,10 @@ func (mod *Module) RegisterWithProtocolFactory(group interface{}, pf IApiProtoco
 		for i := 0; i < groupType.NumMethod(); i++ {
 			m := groupType.Method(i)
 			name := m.Name
+			firstCh := name[:1]
+			if firstCh < "A" || firstCh > "Z" { // Skip private method(s)
+				continue
+			}
 			var methods int
 			if strings.HasSuffix(name, "_GET") {
 				methods = GET
@@ -177,8 +181,6 @@ func (mod *Module) RegisterWithProtocolFactory(group interface{}, pf IApiProtoco
 	}
 	return mod
 }
-
-var bindFunc reflect.Value
 
 func getApiGinFunc(groupValue, funcValue reflect.Value, reqType, rspType reflect.Type, pf IApiProtocolFactory, middlewares []HandlerFunc) func(*gin.Context) {
 	return func(c *gin.Context) {
@@ -247,7 +249,7 @@ func (mod *Module) _Register(groupValue reflect.Value, methods int, path string,
 	} else if funcType.NumIn() == 2 && funcType.NumOut() == 0 {
 		isApi = false
 	} else {
-		panic("handleFunc必须有三个参数,并且只返回一个error")
+		panic("handleFunc必须有一个（*niuhe.Context)或三个(*niuhe.Context, *ReqMsg, *RspMsg)参数,并且只返回一个error")
 	}
 	middlewares = append(mod.middlewares, middlewares...)
 	if isApi {
@@ -263,12 +265,6 @@ func (mod *Module) _Register(groupValue reflect.Value, methods int, path string,
 }
 
 func init() {
-	cType := reflect.TypeOf(&gin.Context{})
-	bindMethod, found := cType.MethodByName("Bind")
-	if !found {
-		panic("Cannot find Bind mathod")
-	}
-	bindFunc = bindMethod.Func
 	defaultApiProtocol = &DefaultApiProtocol{}
 	defaultApiProtocolFactory = ApiProtocolFactoryFunc(GetDefaultApiProtocol)
 }

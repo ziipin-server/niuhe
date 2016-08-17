@@ -7,8 +7,8 @@ import (
 
 type LangEnumType struct {
 	*IntConstGroup
-	ZH_CN IntConstItem	`value:"1" name:"简体中文"`
-	WEIYU IntConstItem	`value:"2" name:"维语"`
+	ZH_CN IntConstItem `value:"1" name:"简体中文"`
+	WEIYU IntConstItem `value:"2" name:"维语"`
 }
 
 var LangEnum LangEnumType
@@ -28,7 +28,6 @@ func TestIntConstGroup(t *testing.T) {
 	}
 	fmt.Println(LangEnum.GetChoices())
 }
-
 
 func init() {
 	InitIntConstGroup(&LangEnum)
