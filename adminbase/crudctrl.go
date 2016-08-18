@@ -122,7 +122,7 @@ func (ctrl *AdminCrudViewCtrl) initDbInfo() {
 			ctrl.editing.toModelMap = make(map[string]*FieldMapping, fieldNum)
 			for i := 0; i < fieldNum; i++ {
 				field := ctrl.modelType.Field(i)
-				if col, exists := ctrl.colMap[field.Name]; exists && col.IsPrimaryKey {
+				if col, exists := ctrl.colMap[field.Name]; exists || col.IsPrimaryKey || col.IsCreated || col.IsUpdated || col.IsDeleted || col.IsVersion {
 					continue
 				}
 				ctrl.editing.updateCols = append(ctrl.editing.updateCols, ctrl.colMap[field.Name].Name)
@@ -147,7 +147,7 @@ func (ctrl *AdminCrudViewCtrl) initDbInfo() {
 			ctrl.adding.toModelMap = make(map[string]*FieldMapping, fieldNum)
 			for i := 0; i < fieldNum; i++ {
 				field := ctrl.modelType.Field(i)
-				if col, exists := ctrl.colMap[field.Name]; exists && (col.IsAutoIncrement || col.IsCreated || col.IsUpdated || col.IsDeleted) {
+				if col, exists := ctrl.colMap[field.Name]; !exists || col.IsAutoIncrement || col.IsCreated || col.IsUpdated || col.IsDeleted || col.IsVersion {
 					continue
 				}
 				mapping := &FieldMapping{field.Name, field.Name, nil, nil}
