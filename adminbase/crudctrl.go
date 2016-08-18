@@ -147,7 +147,7 @@ func (ctrl *AdminCrudViewCtrl) initDbInfo() {
 			ctrl.adding.toModelMap = make(map[string]*FieldMapping, fieldNum)
 			for i := 0; i < fieldNum; i++ {
 				field := ctrl.modelType.Field(i)
-				if col, exists := ctrl.colMap[field.Name]; exists && col.IsAutoIncrement {
+				if col, exists := ctrl.colMap[field.Name]; exists && (col.IsAutoIncrement || col.IsCreated || col.IsUpdated || col.IsDeleted) {
 					continue
 				}
 				mapping := &FieldMapping{field.Name, field.Name, nil, nil}
