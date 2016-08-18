@@ -47,13 +47,11 @@ type AdminCrudViewCtrl struct {
 	GetEngine  func() *xorm.Engine
 	dbInitOnce sync.Once
 	// Common fields
-	pkList       []string
-	pkArgList    []string
-	autoIncrList []string
-	colMap       map[string]*core.Column
+	pkArgList []string
+	colMap    map[string]*core.Column
 	// List Ctrl fields
 	ColRenderers []ColRenderer
-	FilterList   func(c *niuhe.Context, session *xorm.Session) *xorm.Session
+	FilterList   func(c *niuhe.Context, session *xorm.Session) (*xorm.Session, error)
 	// Edit Ctrl fields
 	EditFormFieldMappings []FieldMapping
 	BeforeEditSave        func(c *niuhe.Context, model interface{}, session *xorm.Session) error
@@ -93,17 +91,9 @@ func (ctrl *AdminCrudViewCtrl) initDbInfo() {
 			func(col *core.Column) string { return col.FieldName },
 			nil,
 		).(map[string]*core.Column)
-		ctrl.pkList = pipe.NewPipe(columns).
-			Filter(func(col *core.Column) bool { return col.IsPrimaryKey }).
-			Map(func(col *core.Column) string { return col.FieldName }).
-			ToSlice().([]string)
 		ctrl.pkArgList = pipe.NewPipe(columns).
 			Filter(func(col *core.Column) bool { return col.IsPrimaryKey }).
 			Map(func(col *core.Column) string { return col.Name }).
-			ToSlice().([]string)
-		ctrl.autoIncrList = pipe.NewPipe(columns).
-			Filter(func(col *core.Column) bool { return col.IsAutoIncrement }).
-			Map(func(col *core.Column) string { return col.FieldName }).
 			ToSlice().([]string)
 		// Init editing
 		ctrl.editing.updateCols = make([]string, 0)
@@ -208,11 +198,11 @@ func (ctrl *AdminCrudViewCtrl) ToRow(item interface{}) (res map[string]interface
 	return
 }
 
-func (ctrl *AdminCrudViewCtrl) ApplyFilterList(c *niuhe.Context, session *xorm.Session) *xorm.Session {
+func (ctrl *AdminCrudViewCtrl) ApplyFilterList(c *niuhe.Context, session *xorm.Session) (*xorm.Session, error) {
 	if ctrl.FilterList != nil {
 		return ctrl.FilterList(c, session)
 	} else {
-		return session
+		return session, nil
 	}
 }
 
@@ -239,14 +229,18 @@ func (ctrl *AdminCrudViewCtrl) GetPage(c *niuhe.Context) (outPage int, outPageSi
 	dbSession := ctrl.newSession()
 	defer dbSession.Close()
 	// get total
-	dbSession = ctrl.ApplyFilterList(c, dbSession)
+	if dbSession, err = ctrl.ApplyFilterList(c, dbSession); err != nil {
+		return
+	}
 	var outTotal64 int64
 	if outTotal64, err = dbSession.Count(reflect.New(ctrl.modelType).Interface()); err != nil {
 		return
 	}
 	outTotal = int(outTotal64)
 	// get rows
-	dbSession = ctrl.ApplyFilterList(c, dbSession)
+	if dbSession, err = ctrl.ApplyFilterList(c, dbSession); err != nil {
+		return
+	}
 	mSlice := reflect.MakeSlice(reflect.SliceOf(ctrl.modelType), 0, outPageSize)
 	mSlicePtr := reflect.New(mSlice.Type())
 	mSlicePtr.Elem().Set(mSlice)
