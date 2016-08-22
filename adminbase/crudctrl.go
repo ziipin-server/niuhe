@@ -52,7 +52,7 @@ type AdminCrudViewCtrl struct {
 	// List Ctrl fields
 	ColRenderers []ColRenderer
 	FilterList   func(c *niuhe.Context, session *xorm.Session) (*xorm.Session, error)
-	AfterGetPage func(c *niuhe.Context, rows []map[string]interface{}) ([]map[stirng]interface{}, error)
+	AfterGetPage func(c *niuhe.Context, session *xorm.session, rows []map[string]interface{}) ([]map[stirng]interface{}, error)
 	// Edit Ctrl fields
 	EditFormFieldMappings []FieldMapping
 	BeforeEditSave        func(c *niuhe.Context, model interface{}, session *xorm.Session) error
@@ -253,7 +253,7 @@ func (ctrl *AdminCrudViewCtrl) GetPage(c *niuhe.Context) (outPage int, outPageSi
 			Map(ctrl.ToRow).
 			ToSlice().([]map[string]interface{})
 		if ctrl.AfterGetPage {
-			if outRows, err = ctrl.AfterGetPage(c, outRows); err != nil {
+			if outRows, err = ctrl.AfterGetPage(c, dbSession, outRows); err != nil {
 				return
 			}
 		}
