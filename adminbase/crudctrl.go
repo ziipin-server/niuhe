@@ -3,14 +3,15 @@ package adminbase
 import (
 	"errors"
 	"fmt"
-	"github.com/go-xorm/core"
-	"github.com/go-xorm/xorm"
-	"github.com/lennon-guan/pipe"
-	"github.com/ziipin-server/niuhe"
 	"net/http"
 	"reflect"
 	"strconv"
 	"sync"
+
+	"github.com/go-xorm/core"
+	"github.com/go-xorm/xorm"
+	"github.com/lennon-guan/pipe"
+	"github.com/ziipin-server/niuhe"
 )
 
 type Any map[string]interface{}
@@ -39,7 +40,7 @@ type FieldMapping struct {
 	FormName     string
 	ModelName    string
 	ToFormValue  func(interface{}) interface{}
-	ToModelValue func(string) (interface{}, error)
+	ToModelValue func(string, *niuhe.Context) (interface{}, bool, error)
 }
 
 type AdminCrudViewCtrl struct {
@@ -56,6 +57,7 @@ type AdminCrudViewCtrl struct {
 	// Edit Ctrl fields
 	EditFormFieldMappings []FieldMapping
 	BeforeEditSave        func(c *niuhe.Context, model interface{}, session *xorm.Session) error
+	MergeEditModel        func(c *niuhe.Context, model interface{}) error
 	EditSaved             func(c *niuhe.Context, model interface{}, session *xorm.Session) error
 	editing               struct {
 		toFormMap  map[string]*FieldMapping
@@ -65,6 +67,7 @@ type AdminCrudViewCtrl struct {
 	// Add Ctrl fields
 	AddFormFieldMappings []FieldMapping
 	BeforeAddSave        func(c *niuhe.Context, model interface{}, session *xorm.Session) error
+	MergeAddModel        func(c *niuhe.Context, model interface{}) error
 	AddSaved             func(c *niuhe.Context, model interface{}, session *xorm.Session) error
 	adding               struct {
 		toFormMap  map[string]*FieldMapping
@@ -308,7 +311,7 @@ func (ctrl *AdminCrudViewCtrl) ToForm(model interface{}, mappings map[string]*Fi
 	for i := 0; i < numField; i++ {
 		fieldInfo := ctrl.modelType.Field(i)
 		if mapping, exists := mappings[fieldInfo.Name]; exists {
-			if mapping.ToFormValue != nil {
+			if mapping.ToFormValue != nil && mapping.FormName != "" {
 				res[mapping.FormName] = mapping.ToFormValue(modelVal.Field(i).Interface())
 			} else {
 				res[mapping.FormName] = modelVal.Field(i).Interface()
@@ -400,9 +403,9 @@ func (ctrl *AdminCrudViewCtrl) mergeModel(c *niuhe.Context, model interface{}, m
 			return errors.New("Cannot find field type " + mapping.ModelName)
 		}
 		if mapping.ToModelValue != nil {
-			if mValue, err := mapping.ToModelValue(valStr); err != nil {
+			if mValue, needWrite, err := mapping.ToModelValue(valStr, c); err != nil {
 				return err
-			} else {
+			} else if needWrite {
 				fieldVal.Set(reflect.ValueOf(mValue))
 			}
 		} else if err := ctrl.setFieldValue(fieldVal, fieldTyp, valStr); err != nil {
@@ -446,7 +449,11 @@ func (ctrl *AdminCrudViewCtrl) SaveEditModel(c *niuhe.Context) error {
 			return err
 		}
 	}
-	if err := ctrl.mergeModel(c, model, ctrl.editing.toModelMap); err != nil {
+	if ctrl.MergeEditModel != nil {
+		if err := ctrl.MergeEditModel(c, model); err != nil {
+			return err
+		}
+	} else if err := ctrl.mergeModel(c, model, ctrl.editing.toModelMap); err != nil {
 		return err
 	}
 	if _, err := session.Id(pks).Cols(ctrl.editing.updateCols...).Update(model); err != nil {
@@ -482,7 +489,11 @@ func (ctrl *AdminCrudViewCtrl) SaveAddModel(c *niuhe.Context) error {
 			return err
 		}
 	}
-	if err := ctrl.mergeModel(c, model, ctrl.adding.toModelMap); err != nil {
+	if ctrl.MergeAddModel != nil {
+		if err := ctrl.MergeAddModel(c, model); err != nil {
+			return err
+		}
+	} else if err := ctrl.mergeModel(c, model, ctrl.adding.toModelMap); err != nil {
 		return err
 	}
 	if affected, err := session.Insert(model); err != nil {
