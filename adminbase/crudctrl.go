@@ -43,6 +43,10 @@ type FieldMapping struct {
 	ToModelValue func(string, *niuhe.Context) (interface{}, bool, error)
 }
 
+func IgnoreForm(s string, c *niuhe.Context) (interface{}, bool, error) {
+	return nil, false, nil
+}
+
 type AdminCrudViewCtrl struct {
 	modelType  reflect.Type
 	GetEngine  func() *xorm.Engine
