@@ -120,11 +120,15 @@ func (ctrl *AdminCrudViewCtrl) initDbInfo() {
 			ctrl.editing.toModelMap = make(map[string]*FieldMapping, fieldNum)
 			for i := 0; i < fieldNum; i++ {
 				field := ctrl.modelType.Field(i)
-				if col, exists := ctrl.colMap[field.Name]; exists || col.IsPrimaryKey || col.IsCreated || col.IsUpdated || col.IsDeleted || col.IsVersion {
+				col, exists := ctrl.colMap[field.Name]
+				if !exists {
 					continue
 				}
-				ctrl.editing.updateCols = append(ctrl.editing.updateCols, ctrl.colMap[field.Name].Name)
 				mapping := &FieldMapping{field.Name, field.Name, nil, nil}
+				if col.IsPrimaryKey || col.IsAutoIncrement || col.IsCreated || col.IsUpdated || col.IsDeleted || col.IsVersion {
+					mapping.ToModelValue = IgnoreForm
+				}
+				ctrl.editing.updateCols = append(ctrl.editing.updateCols, ctrl.colMap[field.Name].Name)
 				ctrl.editing.toFormMap[field.Name] = mapping
 				ctrl.editing.toModelMap[field.Name] = mapping
 			}
