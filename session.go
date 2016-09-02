@@ -54,7 +54,7 @@ func (sc *_SessCtrl) Del(c *Context, key string) {
 	delete(sc.initOnce(c).Session.Values, key)
 }
 
-func SessionMiddleware(newStoreFn func() sessions.Store, name string) func(*Context) {
+func SessionMiddleware(name string, newStoreFn func() sessions.Store) func(*Context) {
 	var store sessions.Store
 	var initStoreOnce sync.Once
 	return func(c *Context) {
