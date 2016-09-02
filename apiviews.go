@@ -3,13 +3,11 @@ package niuhe
 import (
 	"errors"
 	"math"
-	"net/http"
 	"reflect"
 	"regexp"
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ziipin-server/zpform"
 )
 
 const (
@@ -46,97 +44,10 @@ func (mod *Module) Use(middlewares ...HandlerFunc) *Module {
 	return mod
 }
 
-type Context struct {
-	*gin.Context
-	index    int8
-	handlers []HandlerFunc
-}
-
-func newContext(c *gin.Context, middlewares []HandlerFunc) *Context {
-	return &Context{Context: c, index: -1, handlers: middlewares}
-}
-
-func (c *Context) Next() {
-	c.index++
-	s := int8(len(c.handlers))
-	for ; c.index < s; c.index++ {
-		c.handlers[c.index](c)
-	}
-}
-
-func (c *Context) Abort() {
-	c.index = abortIndex
-}
-
 func parseName(camelName string) string {
 	re := regexp.MustCompile("[A-Z][a-z0-9]*")
 	parts := re.FindAllString(camelName, -1)
 	return strings.Join(parts, "_")
-}
-
-type IApiProtocol interface {
-	Read(*http.Request, reflect.Value) error
-	Write(*Context, reflect.Value, error) error
-}
-
-type DefaultApiProtocol struct{}
-
-func (self DefaultApiProtocol) Read(request *http.Request, reqValue reflect.Value) error {
-	if err := zpform.ReadReflectedStructForm(request, reqValue); err != nil {
-		return NewCommError(-1, err.Error())
-	}
-	return nil
-}
-
-func (self DefaultApiProtocol) Write(c *Context, rsp reflect.Value, err error) error {
-	var response map[string]interface{}
-	if err != nil {
-		if commErr, ok := err.(ICommError); ok {
-			response = map[string]interface{}{
-				"result":  commErr.GetCode(),
-				"message": commErr.GetMessage(),
-			}
-		} else {
-			response = map[string]interface{}{
-				"result":  -1,
-				"message": err.Error(),
-			}
-		}
-	} else {
-		response = map[string]interface{}{
-			"result": 0,
-			"data":   rsp.Interface(),
-		}
-	}
-	c.JSON(200, response)
-	return nil
-}
-
-type IApiProtocolFactory interface {
-	GetProtocol() IApiProtocol
-}
-
-type ApiProtocolFactoryFunc func() IApiProtocol
-
-func (f ApiProtocolFactoryFunc) GetProtocol() IApiProtocol {
-	return f()
-}
-
-var defaultApiProtocol *DefaultApiProtocol
-
-func GetDefaultApiProtocol() IApiProtocol {
-	LogDebug("GetDefaultApiProtocol")
-	return defaultApiProtocol
-}
-
-var defaultApiProtocolFactory IApiProtocolFactory
-
-func GetDefaultProtocolFactory() IApiProtocolFactory {
-	return defaultApiProtocolFactory
-}
-
-func SetDefaultProtocolFactory(pf IApiProtocolFactory) {
-	defaultApiProtocolFactory = pf
 }
 
 func (mod *Module) Register(group interface{}, middlewares ...HandlerFunc) *Module {
@@ -262,9 +173,4 @@ func (mod *Module) _Register(groupValue reflect.Value, methods int, path string,
 		mod.handlers = append(mod.handlers, routeInfo{Methods: methods, Path: path, handleFunc: ginHandler})
 	}
 	return mod
-}
-
-func init() {
-	defaultApiProtocol = &DefaultApiProtocol{}
-	defaultApiProtocolFactory = ApiProtocolFactoryFunc(GetDefaultApiProtocol)
 }
