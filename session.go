@@ -14,8 +14,18 @@ type _SessCtrl struct {
 	Modified       bool
 }
 
+func (sc *_SessCtrl) initOnce(c *Context) *_SessCtrl {
+	sc.getSessionOnce.Do(func() {
+		var err error
+		if sc.Session, err = sc.Store.Get(c.Request, sc.Name); err != nil {
+			panic(err)
+		}
+	})
+	return sc
+}
+
 func (sc *_SessCtrl) Save(c *Context) error {
-	if !sc.Modified {
+	if !sc.Modified || sc.Session == nil {
 		return nil
 	}
 	if err := sc.Store.Save(c.Request, c.Writer, sc.Session); err != nil {
@@ -25,45 +35,35 @@ func (sc *_SessCtrl) Save(c *Context) error {
 	return nil
 }
 
+func (sc *_SessCtrl) MustSave(c *Context) {
+	if err := sc.Save(c); err != nil {
+		panic(err)
+	}
+}
+
 func (sc *_SessCtrl) Set(c *Context, key string, value interface{}) {
-	sc.getSessionOnce.Do(func() {
-		var err error
-		if sc.Session, err = sc.Store.Get(c.Request, sc.Name); err != nil {
-			panic(err)
-		}
-	})
-	sc.Session.Values[key] = value
+	sc.initOnce(c).Session.Values[key] = value
 	sc.Modified = true
 }
 
 func (sc *_SessCtrl) Get(c *Context, key string) interface{} {
-	sc.getSessionOnce.Do(func() {
-		var err error
-		if sc.Session, err = sc.Store.Get(c.Request, sc.Name); err != nil {
-			panic(err)
-		}
-	})
-	return sc.Session.Values[key]
+	return sc.initOnce(c).Session.Values[key]
 }
 
 func (sc *_SessCtrl) Del(c *Context, key string) {
-	sc.getSessionOnce.Do(func() {
-		var err error
-		if sc.Session, err = sc.Store.Get(c.Request, sc.Name); err != nil {
-			panic(err)
-		}
-	})
-	delete(sc.Session.Values, key)
+	delete(sc.initOnce(c).Session.Values, key)
 }
 
-func SessionMiddleware(getStore func() sessions.Store, name string) func(*Context) {
-	store := getStore()
+func SessionMiddleware(newStoreFn func() sessions.Store, name string) func(*Context) {
+	var store sessions.Store
+	var initStoreOnce sync.Once
 	return func(c *Context) {
+		initStoreOnce.Do(func() {
+			store = newStoreFn()
+		})
 		c.sessCtrl.Store = store
 		c.sessCtrl.Name = name
 		c.Next()
-		if err := c.sessCtrl.Save(c); err != nil {
-			panic(err)
-		}
+		c.sessCtrl.MustSave(c)
 	}
 }
