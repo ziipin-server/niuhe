@@ -9,23 +9,30 @@ import (
 )
 
 type Server struct {
-	PathPrefix  string
-	engine      *gin.Engine
-	modules     []*Module
-	middlewares []gin.HandlerFunc
-	staticPaths []staticPath
+	PathPrefix       string
+	engine           *gin.Engine
+	modules          []*Module
+	middlewares      []gin.HandlerFunc
+	niuheMiddlewares []HandlerFunc
+	staticPaths      []staticPath
 }
 
 func NewServer() *Server {
 	return &Server{
-		modules:     make([]*Module, 0),
-		middlewares: make([]gin.HandlerFunc, 0),
-		staticPaths: make([]staticPath, 0),
+		modules:          make([]*Module, 0),
+		middlewares:      make([]gin.HandlerFunc, 0),
+		niuheMiddlewares: make([]HandlerFunc, 0),
+		staticPaths:      make([]staticPath, 0),
 	}
 }
 
 func (svr *Server) Use(middlewares ...gin.HandlerFunc) *Server {
 	svr.middlewares = append(svr.middlewares, middlewares...)
+	return svr
+}
+
+func (svr *Server) UseNiuhe(middlewares ...HandlerFunc) *Server {
+	svr.niuheMiddlewares = append(svr.niuheMiddlewares, middlewares...)
 	return svr
 }
 
@@ -65,12 +72,12 @@ func (svr *Server) GetGinEngine() *gin.Engine {
 			Use(svr.middlewares...)
 		for _, mod := range svr.modules {
 			group := svr.engine.Group(svr.PathPrefix + mod.urlPrefix)
-			for _, info := range mod.handlers {
+			for _, info := range mod.Routers(svr.niuheMiddlewares) {
 				if (info.Methods & GET) != 0 {
-					group.GET(info.Path, info.handleFunc)
+					group.GET(info.Path, info.HandleFunc)
 				}
 				if (info.Methods & POST) != 0 {
-					group.POST(info.Path, info.handleFunc)
+					group.POST(info.Path, info.HandleFunc)
 				}
 			}
 		}
