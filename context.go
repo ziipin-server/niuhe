@@ -39,6 +39,36 @@ func (c *Context) DelSession(key string) {
 	c.sessCtrl.Del(c, key)
 }
 
+func (c *Context) SessionMaxAge() int {
+	return c.sessCtrl.GetOptions(c).MaxAge
+}
+
+func (c *Context) SetSessionMaxAge(maxAge int) {
+	opts := c.sessCtrl.GetOptions(c)
+	opts.MaxAge = maxAge
+	c.sessCtrl.SetOptions(c, opts)
+}
+
+func (c *Context) SessionDomain() string {
+	return c.sessCtrl.GetOptions(c).Domain
+}
+
+func (c *Context) SetSessionDomain(domain string) {
+	opts := c.sessCtrl.GetOptions(c)
+	opts.Domain = domain
+	c.sessCtrl.SetOptions(c, opts)
+}
+
+func (c *Context) SessionPath() string {
+	return c.sessCtrl.GetOptions(c).Path
+}
+
+func (c *Context) SetSessionPath(path string) {
+	opts := c.sessCtrl.GetOptions(c)
+	opts.Path = path
+	c.sessCtrl.SetOptions(c, opts)
+}
+
 func (c *Context) beforeOutput() {
 	c.sessCtrl.MustSave(c)
 }

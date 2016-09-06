@@ -20,22 +20,26 @@ const (
 type HandlerFunc func(*Context)
 
 type routeInfo struct {
-	Methods    int
-	Path       string
-	handleFunc gin.HandlerFunc
+	Methods     int
+	Path        string
+	HandleFunc  gin.HandlerFunc
+	groupValue  reflect.Value
+	funcValue   reflect.Value
+	pf          IApiProtocolFactory
+	middlewares []HandlerFunc
 }
 
 type Module struct {
 	urlPrefix   string
 	middlewares []HandlerFunc
-	handlers    []routeInfo
+	routers     []*routeInfo
 }
 
 func NewModule(urlPrefix string) *Module {
 	return &Module{
 		urlPrefix:   urlPrefix,
 		middlewares: make([]HandlerFunc, 0),
-		handlers:    make([]routeInfo, 0),
+		routers:     make([]*routeInfo, 0),
 	}
 }
 
@@ -87,13 +91,20 @@ func (mod *Module) RegisterWithProtocolFactory(group interface{}, pf IApiProtoco
 				methods = GET_POST
 			}
 			path := strings.ToLower("/" + parseName(groupName) + "/" + parseName(name) + "/")
-			mod._Register(groupValue, methods, path, m.Func, pf, middlewares)
+			mod.routers = append(mod.routers, &routeInfo{
+				Methods:     methods,
+				Path:        path,
+				groupValue:  groupValue,
+				funcValue:   m.Func,
+				pf:          pf,
+				middlewares: middlewares,
+			})
 		}
 	}
 	return mod
 }
 
-func getApiGinFunc(groupValue, funcValue reflect.Value, reqType, rspType reflect.Type, pf IApiProtocolFactory, middlewares []HandlerFunc) func(*gin.Context) {
+func getApiGinFunc(groupValue, funcValue reflect.Value, reqType, rspType reflect.Type, pf IApiProtocolFactory, middlewares []HandlerFunc) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		req := reflect.New(reqType)
 		rsp := reflect.New(rspType)
@@ -136,7 +147,7 @@ func getApiGinFunc(groupValue, funcValue reflect.Value, reqType, rspType reflect
 	}
 }
 
-func getWebGinFunc(groupValue, funcValue reflect.Value, middlewares []HandlerFunc) func(*gin.Context) {
+func getWebGinFunc(groupValue, funcValue reflect.Value, middlewares []HandlerFunc) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		context := newContext(c, middlewares)
 		context.handlers = append(context.handlers, func(c *Context) {
@@ -149,7 +160,9 @@ func getWebGinFunc(groupValue, funcValue reflect.Value, middlewares []HandlerFun
 	}
 }
 
-func (mod *Module) _Register(groupValue reflect.Value, methods int, path string, funcValue reflect.Value, pf IApiProtocolFactory, middlewares []HandlerFunc) *Module {
+func getGinFunc(
+	groupValue reflect.Value, methods int, path string, funcValue reflect.Value, pf IApiProtocolFactory, middlewares []HandlerFunc,
+) (ginHandler gin.HandlerFunc) {
 	funcType := funcValue.Type()
 	if funcType.Kind() != reflect.Func {
 		panic("handleFunc必须为函数")
@@ -162,15 +175,22 @@ func (mod *Module) _Register(groupValue reflect.Value, methods int, path string,
 	} else {
 		panic("handleFunc必须有一个（*niuhe.Context)或三个(*niuhe.Context, *ReqMsg, *RspMsg)参数,并且只返回一个error")
 	}
-	middlewares = append(mod.middlewares, middlewares...)
 	if isApi {
 		reqType := funcType.In(2).Elem()
 		rspType := funcType.In(3).Elem()
-		ginHandler := getApiGinFunc(groupValue, funcValue, reqType, rspType, pf, middlewares)
-		mod.handlers = append(mod.handlers, routeInfo{Methods: methods, Path: path, handleFunc: ginHandler})
+		ginHandler = getApiGinFunc(groupValue, funcValue, reqType, rspType, pf, middlewares)
 	} else {
-		ginHandler := getWebGinFunc(groupValue, funcValue, middlewares)
-		mod.handlers = append(mod.handlers, routeInfo{Methods: methods, Path: path, handleFunc: ginHandler})
+		ginHandler = getWebGinFunc(groupValue, funcValue, middlewares)
 	}
-	return mod
+	return
+}
+
+func (mod *Module) Routers(svrMiddlewares []HandlerFunc) []*routeInfo {
+	for _, router := range mod.routers {
+		middlewares := append(mod.middlewares, svrMiddlewares...)
+		middlewares = append(middlewares, router.middlewares...)
+		router.HandleFunc = getGinFunc(
+			router.groupValue, router.Methods, router.Path, router.funcValue, router.pf, middlewares)
+	}
+	return mod.routers
 }
