@@ -29,6 +29,9 @@ func (self DefaultApiProtocol) Write(c *Context, rsp reflect.Value, err error) e
 				"result":  commErr.GetCode(),
 				"message": commErr.GetMessage(),
 			}
+			if commErr.GetCode() == 0 {
+				response["data"] = rsp.Interface()
+			}
 		} else {
 			response = map[string]interface{}{
 				"result":  -1,

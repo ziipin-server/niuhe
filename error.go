@@ -31,3 +31,7 @@ func (err *CommError) GetMessage() string {
 func (err *CommError) Error() string {
 	return fmt.Sprintf("%d:%s", err.Code, err.Message)
 }
+
+func NewNotice(message string) *CommError {
+	return NewCommError(0, message)
+}
