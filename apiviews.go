@@ -106,21 +106,20 @@ func (mod *Module) RegisterWithProtocolFactory(group interface{}, pf IApiProtoco
 
 func getApiGinFunc(groupValue, funcValue reflect.Value, reqType, rspType reflect.Type, pf IApiProtocolFactory, middlewares []HandlerFunc) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		req := reflect.New(reqType)
-		rsp := reflect.New(rspType)
-		var ierr interface{}
-		var protocol IApiProtocol
-		if pf == nil {
-			protocol = GetDefaultProtocolFactory().GetProtocol()
-		} else {
-			protocol = pf.GetProtocol()
-		}
 		context := newContext(c, middlewares)
-		if formErr := protocol.Read(context, req); formErr != nil {
-			ierr = formErr
-		}
-		if ierr == nil {
-			context.handlers = append(context.handlers, func(c *Context) {
+		context.handlers = append(context.handlers, func(c *Context) {
+			req := reflect.New(reqType)
+			rsp := reflect.New(rspType)
+			var ierr interface{}
+			var protocol IApiProtocol
+			if pf == nil {
+				protocol = GetDefaultProtocolFactory().GetProtocol()
+			} else {
+				protocol = pf.GetProtocol()
+			}
+			if readErr := protocol.Read(context, req); readErr != nil {
+				ierr = readErr
+			} else {
 				outs := funcValue.Call([]reflect.Value{
 					groupValue,
 					reflect.ValueOf(context),
@@ -128,22 +127,22 @@ func getApiGinFunc(groupValue, funcValue reflect.Value, reqType, rspType reflect
 					rsp,
 				})
 				ierr = outs[0].Interface()
-			})
-			context.Next()
-		}
-		var rspErr error
-		if ierr != nil {
-			if err, ok := ierr.(error); ok {
-				rspErr = err
-			} else {
-				rspErr = errors.New("unknown error")
 			}
-		} else {
-			rspErr = nil
-		}
-		if err := protocol.Write(context, rsp, rspErr); err != nil {
-			panic(err)
-		}
+			var rspErr error
+			if ierr != nil {
+				if err, ok := ierr.(error); ok {
+					rspErr = err
+				} else {
+					rspErr = errors.New("unknown error")
+				}
+			} else {
+				rspErr = nil
+			}
+			if err := protocol.Write(context, rsp, rspErr); err != nil {
+				panic(err)
+			}
+		})
+		context.Next()
 	}
 }
 
