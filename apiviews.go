@@ -115,10 +115,10 @@ func getApiGinFunc(groupValue, funcValue reflect.Value, reqType, rspType reflect
 		} else {
 			protocol = pf.GetProtocol()
 		}
-		if formErr := protocol.Read(c.Request, req); formErr != nil {
+		context := newContext(c, middlewares)
+		if formErr := protocol.Read(context, req); formErr != nil {
 			ierr = formErr
 		}
-		context := newContext(c, middlewares)
 		if ierr == nil {
 			context.handlers = append(context.handlers, func(c *Context) {
 				outs := funcValue.Call([]reflect.Value{

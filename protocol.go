@@ -1,21 +1,20 @@
 package niuhe
 
 import (
-	"net/http"
 	"reflect"
 
 	"github.com/ziipin-server/zpform"
 )
 
 type IApiProtocol interface {
-	Read(*http.Request, reflect.Value) error
+	Read(*Context, reflect.Value) error
 	Write(*Context, reflect.Value, error) error
 }
 
 type DefaultApiProtocol struct{}
 
-func (self DefaultApiProtocol) Read(request *http.Request, reqValue reflect.Value) error {
-	if err := zpform.ReadReflectedStructForm(request, reqValue); err != nil {
+func (self DefaultApiProtocol) Read(c *Context, reqValue reflect.Value) error {
+	if err := zpform.ReadReflectedStructForm(c.Request, reqValue); err != nil {
 		return NewCommError(-1, err.Error())
 	}
 	return nil
