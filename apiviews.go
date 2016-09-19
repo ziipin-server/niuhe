@@ -186,7 +186,9 @@ func getGinFunc(
 
 func (mod *Module) Routers(svrMiddlewares []HandlerFunc) []*routeInfo {
 	for _, router := range mod.routers {
-		middlewares := append(mod.middlewares, svrMiddlewares...)
+		middlewares := make([]HandlerFunc, 0, len(svrMiddlewares)+len(mod.middlewares)+len(router.middlewares))
+		middlewares = append(middlewares, svrMiddlewares...)
+		middlewares = append(middlewares, mod.middlewares...)
 		middlewares = append(middlewares, router.middlewares...)
 		router.HandleFunc = getGinFunc(
 			router.groupValue, router.Methods, router.Path, router.funcValue, router.pf, middlewares)
