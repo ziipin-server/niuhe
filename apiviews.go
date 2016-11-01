@@ -33,13 +33,23 @@ type Module struct {
 	urlPrefix   string
 	middlewares []HandlerFunc
 	routers     []*routeInfo
+	pf          IApiProtocolFactory
 }
 
 func NewModule(urlPrefix string) *Module {
+	return NewModuleWithProtocolFactory(urlPrefix, nil)
+}
+
+func NewModuleWithProtocolFactoryFunc(urlPrefix string, pff func() IApiProtocol) *Module {
+	return NewModuleWithProtocolFactory(urlPrefix, ApiProtocolFactoryFunc(pff))
+}
+
+func NewModuleWithProtocolFactory(urlPrefix string, pf IApiProtocolFactory) *Module {
 	return &Module{
 		urlPrefix:   urlPrefix,
 		middlewares: make([]HandlerFunc, 0),
 		routers:     make([]*routeInfo, 0),
+		pf:          pf,
 	}
 }
 
@@ -67,6 +77,9 @@ type IModuleGroup interface {
 }
 
 func (mod *Module) RegisterWithProtocolFactory(group interface{}, pf IApiProtocolFactory, middlewares ...HandlerFunc) *Module {
+	if pf == nil && mod.pf != nil {
+		pf = mod.pf
+	}
 	if modGroup, ok := group.(IModuleGroup); ok {
 		modGroup.Register(mod, pf, middlewares...)
 	} else {

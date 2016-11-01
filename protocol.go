@@ -60,6 +60,7 @@ func (f ApiProtocolFactoryFunc) GetProtocol() IApiProtocol {
 var defaultApiProtocol *DefaultApiProtocol
 
 func GetDefaultApiProtocol() IApiProtocol {
+	LogDebug("GetDefaultApiProtocol")
 	return defaultApiProtocol
 }
 
