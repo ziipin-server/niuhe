@@ -88,6 +88,7 @@ func (db *DB) Atom(fn func() error) error {
 	if dberr != nil {
 		panic(dberr)
 	}
+	db.Close() // close session
 	return err
 
 }
@@ -98,6 +99,11 @@ func (db *DB) Close() {
 		if db.session != nil {
 			db.session.Close()
 		}
+		db.session = nil
+		db.lock.Unlock()
+	}
+	if db.slaveSession != nil {
+		db.lock.Lock()
 		if db.slaveSession != nil {
 			db.slaveSession.Close()
 		}
