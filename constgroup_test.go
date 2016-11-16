@@ -30,5 +30,5 @@ func TestIntConstGroup(t *testing.T) {
 }
 
 func init() {
-	InitIntConstGroup(&LangEnum)
+	InitConstGroup(&LangEnum)
 }
