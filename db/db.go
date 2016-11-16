@@ -84,13 +84,13 @@ func (db *DB) Atom(fn func() error) error {
 			dberr = session.Commit()
 		}
 	}
+	session.Close()
+	db.session = nil
+	db.masterOnce = sync.Once{}
 	db.lock.Unlock()
 	if dberr != nil {
 		panic(dberr)
 	}
-	session.Close()
-	db.session = nil
-	db.masterOnce = sync.Once{}
 	return err
 
 }
