@@ -88,7 +88,9 @@ func (db *DB) Atom(fn func() error) error {
 	if dberr != nil {
 		panic(dberr)
 	}
-	db.Close() // close session
+	session.Close()
+	db.session = nil
+	db.masterOnce = sync.Once{}
 	return err
 
 }
