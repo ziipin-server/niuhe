@@ -1,6 +1,7 @@
 package niuhe
 
 import (
+	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -35,6 +36,14 @@ func (g *IntConstGroup) addField(value int, name string) {
 
 func (g *IntConstGroup) GetName(value int) string {
 	name, _ := g.items[value]
+	return name
+}
+
+func (g *IntConstGroup) MustGetName(value int) string {
+	name, exists := g.items[value]
+	if !exists {
+		panic(fmt.Sprintf("MustGetName fail: Cannot find value %d", value))
+	}
 	return name
 }
 
@@ -81,6 +90,14 @@ func (g *StringConstGroup) addField(value, name string) {
 
 func (g *StringConstGroup) GetName(value string) string {
 	name, _ := g.items[value]
+	return name
+}
+
+func (g *StringConstGroup) MustGetName(value string) string {
+	name, exists := g.items[value]
+	if !exists {
+		panic(fmt.Sprintf("MustGetName fail: Cannot find value %d", value))
+	}
 	return name
 }
 

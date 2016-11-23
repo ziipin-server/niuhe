@@ -1,10 +1,6 @@
 package niuhe
 
-import (
-	"os"
-	"testing"
-)
-
+/*
 func TestSimpleLog(t *testing.T) {
 	LogDebug("1")
 	LogInfo("2")
@@ -37,3 +33,4 @@ func TestNewLogger(t *testing.T) {
 	logger.Error("x 4")
 	logger.Fatal("x 5")
 }
+*/
