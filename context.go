@@ -100,9 +100,9 @@ type _ICanYAML interface {
 }
 
 func (c *Context) YAML(code int, obj interface{}) {
-	if _, ok := interface{}(c.Context).(_ICanYAML); !ok {
+	if ctx, ok := interface{}(c.Context).(_ICanYAML); !ok {
 		c.beforeOutput()
-		c.Context.YAML(code, obj)
+		ctx.YAML(code, obj)
 	} else {
 		panic("Current version of gin cannot output YAML")
 	}
