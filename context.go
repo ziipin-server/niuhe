@@ -94,9 +94,18 @@ func (c *Context) XML(code int, obj interface{}) {
 }
 
 // YAML serializes the given struct as YAML into the response body.
+
+type _ICanYAML interface {
+	YAML(code int, obj interface{})
+}
+
 func (c *Context) YAML(code int, obj interface{}) {
-	c.beforeOutput()
-	c.Context.YAML(code, obj)
+	if _, ok := interface{}(c.Context).(_ICanYAML); !ok {
+		c.beforeOutput()
+		c.Context.YAML(code, obj)
+	} else {
+		panic("Current version of gin cannot output YAML")
+	}
 }
 
 // String writes the given string into the response body.
