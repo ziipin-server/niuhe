@@ -50,6 +50,7 @@ func IgnoreForm(s string, c *niuhe.Context) (interface{}, bool, error) {
 type AdminCrudViewCtrl struct {
 	modelType  reflect.Type
 	GetEngine  func() *xorm.Engine
+	EnginePtr  **xorm.Engine
 	dbInitOnce sync.Once
 	// Common fields
 	pkArgList []string
@@ -86,6 +87,13 @@ func (ctrl *AdminCrudViewCtrl) Init(newModel interface{}) {
 	if modelType.Kind() == reflect.Ptr {
 		modelType = modelType.Elem()
 	}
+	if ctrl.GetEngine == nil {
+		if ctrl.EnginePtr != nil {
+			ctrl.GetEngine = func() *xorm.Engine { return *ctrl.EnginePtr }
+		} else {
+			panic("neither GetEngine nor EnginePtr is found!")
+		}
+	}
 	ctrl.modelType = modelType
 }
 
@@ -96,9 +104,9 @@ func (ctrl *AdminCrudViewCtrl) initDbInfo() {
 		columns := tableInfo.Columns()
 		ctrl.colMap = pipe.NewPipe(columns).
 			ToMap(
-			func(col *core.Column) string { return col.FieldName },
-			nil,
-		).(map[string]*core.Column)
+				func(col *core.Column) string { return col.FieldName },
+				nil,
+			).(map[string]*core.Column)
 		ctrl.pkArgList = pipe.NewPipe(columns).
 			Filter(func(col *core.Column) bool { return col.IsPrimaryKey }).
 			Map(func(col *core.Column) string { return col.Name }).
