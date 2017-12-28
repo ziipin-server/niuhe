@@ -2,7 +2,11 @@ package adminbase
 
 import (
 	"reflect"
+	"regexp"
+	"strings"
 	"unicode"
+
+	"github.com/robertkrimen/otto"
 )
 
 func MakeColRenderer(modelField, colField string) ColRenderer {
@@ -91,6 +95,73 @@ func MakeSnakeRenderers(model interface{}, skipModelFields ...string) []ColRende
 			continue
 		}
 		renderers = append(renderers, MakeColRenderer(fname, pascalToSnake(fname)))
+	}
+	return renderers
+}
+
+func MakeRenderersByRules(ruleSrc string) []ColRenderer {
+	lines := strings.Split(ruleSrc, "\n")
+	renderers := make([]ColRenderer, 0, len(lines))
+	for _, line := range lines {
+		line = strings.Trim(line, " \t\r")
+		if line == "" {
+			continue
+		}
+		if m, err := regexp.MatchString("^\\w+$", line); err == nil && m {
+			renderers = append(renderers, MakeSameRenderer(line))
+		} else if m, err := regexp.MatchString(`^\w+\s*:\s*\w+$`, line); err == nil && m {
+			re := regexp.MustCompile(`(\w+)\s*:\s*(\w+)`)
+			caps := re.FindStringSubmatch(line)
+			if len(caps) != 3 {
+				panic("parse error")
+			}
+			renderers = append(renderers, MakeColRenderer(caps[2], caps[1]))
+		}
+	}
+	return renderers
+}
+
+func MakeRenderersByJS(jsSrc string) []ColRenderer {
+	renderers := make([]ColRenderer, 0)
+	vm := otto.New()
+	jsDef, err := vm.Run("(" + jsSrc + ")")
+	if err != nil {
+		panic(err)
+	}
+	if !jsDef.IsObject() {
+		panic("jsDef must be an object")
+	}
+	defObj := jsDef.Object()
+	cols := defObj.Keys()
+	for _, col := range cols {
+		colVal, err := defObj.Get(col)
+		if err != nil {
+			panic(err)
+		}
+		if colVal.IsNull() {
+			renderers = append(renderers, MakeSameRenderer(col))
+		} else if colVal.IsString() {
+			modelField, _ := colVal.ToString()
+			renderers = append(renderers, MakeColRenderer(modelField, col))
+		} else if colVal.IsFunction() {
+			r := ColRenderer{
+				ColName: col,
+				RenderFunc: func(model interface{}) interface{} {
+					ret, err := colVal.Call(otto.UndefinedValue(), model)
+					if err != nil {
+						return nil
+					}
+					retVal, retErr := ret.Export()
+					if retErr != nil {
+						return nil
+					}
+					return retVal
+				},
+			}
+			renderers = append(renderers, r)
+		} else {
+			panic("invalid field type " + col)
+		}
 	}
 	return renderers
 }

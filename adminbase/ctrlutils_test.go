@@ -56,3 +56,15 @@ func TestMakeSnakeRenderers(t *testing.T) {
 		t.Error("len error", r)
 	}
 }
+
+func TestMakeRenderersByRules(t *testing.T) {
+	r := MakeRenderersByRules(`
+		Name
+		Name: name123
+		Hello: world
+
+	`)
+	if len(r) != 3 {
+		t.Error("len error", r)
+	}
+}

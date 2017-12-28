@@ -76,6 +76,18 @@ type IModuleGroup interface {
 	Register(*Module, IApiProtocolFactory, ...HandlerFunc)
 }
 
+func (mod *Module) AddCustomRoute(methods int, path string, groupValue, funcValue reflect.Value,
+	pf IApiProtocolFactory, middlewares []HandlerFunc) {
+	mod.routers = append(mod.routers, &routeInfo{
+		Methods:     methods,
+		Path:        path,
+		groupValue:  groupValue,
+		funcValue:   funcValue,
+		pf:          pf,
+		middlewares: middlewares,
+	})
+}
+
 func (mod *Module) RegisterWithProtocolFactory(group interface{}, pf IApiProtocolFactory, middlewares ...HandlerFunc) *Module {
 	if pf == nil && mod.pf != nil {
 		pf = mod.pf
@@ -104,14 +116,7 @@ func (mod *Module) RegisterWithProtocolFactory(group interface{}, pf IApiProtoco
 				methods = GET_POST
 			}
 			path := strings.ToLower("/" + parseName(groupName) + "/" + parseName(name) + "/")
-			mod.routers = append(mod.routers, &routeInfo{
-				Methods:     methods,
-				Path:        path,
-				groupValue:  groupValue,
-				funcValue:   m.Func,
-				pf:          pf,
-				middlewares: middlewares,
-			})
+			mod.AddCustomRoute(methods, path, groupValue, m.Func, pf, middlewares)
 		}
 	}
 	return mod
