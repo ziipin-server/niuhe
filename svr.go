@@ -50,7 +50,12 @@ func (svr *Server) RegisterModule(mod *Module) {
 }
 
 func (svr *Server) Serve(addr string) {
-	svr.GetGinEngine().Run(addr)
+	ginEngine := svr.GetGinEngine()
+	if strings.HasPrefix(addr, "unix:") {
+		ginEngine.RunUnix(addr[5:])
+	} else {
+		ginEngine.Run(addr)
+	}
 }
 
 type staticPath struct {
