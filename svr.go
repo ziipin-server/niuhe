@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -52,7 +53,12 @@ func (svr *Server) RegisterModule(mod *Module) {
 func (svr *Server) Serve(addr string) {
 	ginEngine := svr.GetGinEngine()
 	if strings.HasPrefix(addr, "unix:") {
-		ginEngine.RunUnix(addr[5:])
+		filename := addr[5:]
+		go func() {
+			time.Sleep(1 * time.Second)
+			os.Chmod(filename, 0777)
+		}()
+		ginEngine.RunUnix(filename)
 	} else {
 		ginEngine.Run(addr)
 	}
