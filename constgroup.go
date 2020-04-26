@@ -96,7 +96,7 @@ func (g *StringConstGroup) GetName(value string) string {
 func (g *StringConstGroup) MustGetName(value string) string {
 	name, exists := g.items[value]
 	if !exists {
-		panic(fmt.Sprintf("MustGetName fail: Cannot find value %d", value))
+		panic(fmt.Sprintf("MustGetName fail: Cannot find value %s", value))
 	}
 	return name
 }

@@ -1,6 +1,11 @@
 package niuhe
 
-/*
+import (
+	"fmt"
+	"testing"
+	"os"
+)
+
 func TestSimpleLog(t *testing.T) {
 	LogDebug("1")
 	LogInfo("2")
@@ -19,6 +24,9 @@ func TestSetLogLevel(t *testing.T) {
 }
 
 func TestNewLogger(t *testing.T) {
+	AddLogCallback(LOG_ERROR, func(msg string) {
+		fmt.Println("LOG_ERROR", msg)
+	})
 	SetLogLevel(LOG_WARN)
 	LogDebug("1")
 	LogInfo("2")
@@ -33,4 +41,3 @@ func TestNewLogger(t *testing.T) {
 	logger.Error("x 4")
 	logger.Fatal("x 5")
 }
-*/

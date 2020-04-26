@@ -12,14 +12,23 @@ const (
 	LOG_INFO
 	LOG_WARN
 	LOG_ERROR
+	LOG_ASSERT
 	LOG_FATAL
 	end_log_level
 	DEFAULT_LOG_FLAGS = log.Ldate | log.Ltime | log.Lshortfile
 )
 
 type LoggerT struct {
-	minLevel int
-	loggers  []*log.Logger
+	minLevel  int
+	loggers   []*log.Logger
+	callbacks struct {
+		debug  []func(string)
+		info   []func(string)
+		warn   []func(string)
+		error  []func(string)
+		assert []func(string)
+		fatal  []func(string)
+	}
 }
 
 var defaultLogger *LoggerT
@@ -37,6 +46,9 @@ func MustParseLogLevelName(name string) int {
 	if name == "ERROR" {
 		return LOG_ERROR
 	}
+	if name == "ASSERT" {
+		return LOG_ASSERT
+	}
 	if name == "FATAL" {
 		return LOG_FATAL
 	}
@@ -51,6 +63,7 @@ func NewLogger(out io.Writer, prefix string) *LoggerT {
 			log.New(out, prefix+"[INF]", DEFAULT_LOG_FLAGS),
 			log.New(out, prefix+"[WRN]", DEFAULT_LOG_FLAGS),
 			log.New(out, prefix+"[ERR]", DEFAULT_LOG_FLAGS),
+			log.New(out, prefix+"[AST]", DEFAULT_LOG_FLAGS),
 			log.New(out, prefix+"[FAT]", DEFAULT_LOG_FLAGS),
 			log.New(out, prefix+"[PAN]", DEFAULT_LOG_FLAGS),
 		},
@@ -66,10 +79,36 @@ func (l *LoggerT) log(level int, calldepth int, format string, args ...interface
 		return false
 	}
 	logger := l.loggers[level]
-	if len(args) < 1 {
-		logger.Output(calldepth, format)
-	} else {
-		logger.Output(calldepth, fmt.Sprintf(format, args...))
+	var content = format
+	if len(args) > 0 {
+		content = fmt.Sprintf(format, args...)
+	}
+	logger.Output(calldepth, content)
+	switch level {
+	case LOG_DEBUG:
+		for _, cb := range l.callbacks.debug {
+			cb(content)
+		}
+	case LOG_INFO:
+		for _, cb := range l.callbacks.info {
+			cb(content)
+		}
+	case LOG_WARN:
+		for _, cb := range l.callbacks.warn {
+			cb(content)
+		}
+	case LOG_ERROR:
+		for _, cb := range l.callbacks.error {
+			cb(content)
+		}
+	case LOG_ASSERT:
+		for _, cb := range l.callbacks.assert {
+			cb(content)
+		}
+	case LOG_FATAL:
+		for _, cb := range l.callbacks.fatal {
+			cb(content)
+		}
 	}
 	return true
 }
@@ -90,8 +129,29 @@ func (l *LoggerT) Error(format string, args ...interface{}) bool {
 	return l.log(LOG_ERROR, 3, format, args...)
 }
 
+func (l *LoggerT) Assert(format string, args ...interface{}) bool {
+	return l.log(LOG_ASSERT, 3, format, args...)
+}
+
 func (l *LoggerT) Fatal(format string, args ...interface{}) bool {
 	return l.log(LOG_FATAL, 3, format, args...)
+}
+
+func (l *LoggerT) AddCallback(level int, callbackFunc func(string)) {
+	switch level {
+	case LOG_DEBUG:
+		l.callbacks.debug = append(l.callbacks.debug, callbackFunc)
+	case LOG_INFO:
+		l.callbacks.info = append(l.callbacks.info, callbackFunc)
+	case LOG_WARN:
+		l.callbacks.warn = append(l.callbacks.warn, callbackFunc)
+	case LOG_ERROR:
+		l.callbacks.error = append(l.callbacks.error, callbackFunc)
+	case LOG_ASSERT:
+		l.callbacks.assert = append(l.callbacks.assert, callbackFunc)
+	case LOG_FATAL:
+		l.callbacks.fatal = append(l.callbacks.fatal, callbackFunc)
+	}
 }
 
 func SetLogLevel(logLevel int) {
@@ -114,8 +174,16 @@ func LogError(format string, args ...interface{}) bool {
 	return defaultLogger.log(LOG_ERROR, 3, format, args...)
 }
 
+func LogAssert(format string, args ...interface{}) bool {
+	return defaultLogger.log(LOG_ASSERT, 3, format, args...)
+}
+
 func LogFatal(format string, args ...interface{}) bool {
 	return defaultLogger.log(LOG_FATAL, 3, format, args...)
+}
+
+func AddLogCallback(level int, callback func(string)) {
+	defaultLogger.AddCallback(level, callback)
 }
 
 func init() {
