@@ -56,43 +56,48 @@ func (db *DB) GetDB() *xorm.Session {
 }
 
 func (db *DB) Atom(fn func() error) error {
+	var dberr error
 	session := db.GetMasterDB()
 	db.lock.Lock()
 	if db.txLevel > 0 {
-		session.Exec("SAVEPOINT SP_" + strconv.Itoa(db.txLevel))
+		_, dberr = session.Exec("SAVEPOINT SP_" + strconv.Itoa(db.txLevel))
 	} else {
-		session.Begin()
+		dberr = session.Begin()
+	}
+	if dberr != nil {
+		db.lock.Unlock()
+		panic(dberr)
 	}
 	db.txLevel++
 	db.lock.Unlock()
 
-	err := fn()
-
-	var dberr error
-	db.lock.Lock()
-	db.txLevel--
-	if db.txLevel > 0 {
-		if err != nil {
-			_, dberr = session.Exec("ROLLBACK TO SP_" + strconv.Itoa(db.txLevel))
+	var err error
+	defer func() {
+		db.lock.Lock()
+		defer db.lock.Unlock()
+		db.txLevel--
+		if db.txLevel > 0 {
+			if err != nil {
+				_, dberr = session.Exec("ROLLBACK TO SP_" + strconv.Itoa(db.txLevel))
+			} else {
+				_, dberr = session.Exec("RELEASE SAVEPOINT SP_" + strconv.Itoa(db.txLevel))
+			}
 		} else {
-			_, dberr = session.Exec("RELEASE SAVEPOINT SP_" + strconv.Itoa(db.txLevel))
+			if err != nil {
+				dberr = session.Rollback()
+			} else {
+				dberr = session.Commit()
+			}
+			session.Close()
+			db.session = nil
+			db.masterOnce = sync.Once{}
 		}
-	} else {
-		if err != nil {
-			dberr = session.Rollback()
-		} else {
-			dberr = session.Commit()
+		if dberr != nil {
+			panic(dberr)
 		}
-	}
-	session.Close()
-	db.session = nil
-	db.masterOnce = sync.Once{}
-	db.lock.Unlock()
-	if dberr != nil {
-		panic(dberr)
-	}
+	}()
+	err = fn()
 	return err
-
 }
 
 func (db *DB) Close() {
