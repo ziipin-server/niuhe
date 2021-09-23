@@ -137,6 +137,36 @@ func (l *LoggerT) Fatal(format string, args ...interface{}) bool {
 	return l.log(LOG_FATAL, 3, format, args...)
 }
 
+// DebugUp calldepth +up
+func (l *LoggerT) DebugUp(up int, format string, args ...interface{}) bool {
+	return l.log(LOG_DEBUG, 3+up, format, args...)
+}
+
+func (l *LoggerT) InfoUp(up int, format string, args ...interface{}) bool {
+	return l.log(LOG_INFO, 3+up, format, args...)
+}
+
+func (l *LoggerT) WarnUp(up int, format string, args ...interface{}) bool {
+	return l.log(LOG_WARN, 3+up, format, args...)
+}
+
+func (l *LoggerT) ErrorUp(up int, format string, args ...interface{}) bool {
+	return l.log(LOG_ERROR, 3+up, format, args...)
+}
+
+func (l *LoggerT) AssertUp(up int, format string, args ...interface{}) bool {
+	return l.log(LOG_ASSERT, 3+up, format, args...)
+}
+
+func (l *LoggerT) FatalUp(up int, format string, args ...interface{}) bool {
+	return l.log(LOG_FATAL, 3+up, format, args...)
+}
+
+//Logger export default looger
+func Logger() *LoggerT {
+	return defaultLogger
+}
+
 func (l *LoggerT) AddCallback(level int, callbackFunc func(string)) {
 	switch level {
 	case LOG_DEBUG:
