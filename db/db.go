@@ -72,18 +72,19 @@ func (db *DB) Atom(fn func() error) error {
 	db.lock.Unlock()
 
 	var err error
+	hasPanic := true
 	defer func() {
 		db.lock.Lock()
 		defer db.lock.Unlock()
 		db.txLevel--
 		if db.txLevel > 0 {
-			if err != nil {
+			if err != nil || hasPanic {
 				_, dberr = session.Exec("ROLLBACK TO SP_" + strconv.Itoa(db.txLevel))
 			} else {
 				_, dberr = session.Exec("RELEASE SAVEPOINT SP_" + strconv.Itoa(db.txLevel))
 			}
 		} else {
-			if err != nil {
+			if err != nil || hasPanic {
 				dberr = session.Rollback()
 			} else {
 				dberr = session.Commit()
@@ -97,7 +98,9 @@ func (db *DB) Atom(fn func() error) error {
 		}
 	}()
 	err = fn()
+	hasPanic = false
 	return err
+
 }
 
 func (db *DB) Close() {
