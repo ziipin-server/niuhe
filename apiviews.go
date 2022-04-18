@@ -134,6 +134,11 @@ func (mod *Module) RegisterWithProtocolFactory(group interface{}, pf IApiProtoco
 	return mod
 }
 
+type DisposableHolder struct {
+	Value    interface{}
+	Disposer func()
+}
+
 func getApiGinFunc(groupValue reflect.Value, path string, funcValue reflect.Value, reqType, rspType reflect.Type, injectTypes []reflect.Type, pf IApiProtocolFactory, middlewares []HandlerFunc) gin.HandlerFunc {
 	injectors := make([]Injector, len(injectTypes))
 	for i, t := range injectTypes {
@@ -158,6 +163,12 @@ func getApiGinFunc(groupValue reflect.Value, path string, funcValue reflect.Valu
 			if readErr := protocol.Read(context, req); readErr != nil {
 				ierr = readErr
 			} else {
+				diposers := []func(){}
+				defer func() {
+					for _, disposer := range diposers {
+						disposer()
+					}
+				}()
 				args := []reflect.Value{
 					groupValue,
 					reflect.ValueOf(context),
@@ -169,7 +180,13 @@ func getApiGinFunc(groupValue reflect.Value, path string, funcValue reflect.Valu
 						ierr = err
 						break
 					} else {
-						args = append(args, reflect.ValueOf(injectValue))
+						switch iv := injectValue.(type) {
+						case DisposableHolder:
+							diposers = append(diposers, iv.Disposer)
+							args = append(args, reflect.ValueOf(iv.Value))
+						default:
+							args = append(args, reflect.ValueOf(injectValue))
+						}
 					}
 				}
 				if ierr == nil {
