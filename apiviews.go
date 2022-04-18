@@ -23,6 +23,9 @@ type Injector = func(*Context, interface{}) (interface{}, error)
 var globalInjectors = map[reflect.Type]Injector{}
 
 func RegisterInjector(t reflect.Type, injector Injector) {
+	if _, exists := globalInjectors[t]; exists {
+		panic(fmt.Sprintf("类型%+v的注入器被重复注册!", t))
+	}
 	globalInjectors[t] = injector
 }
 
