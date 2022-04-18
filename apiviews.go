@@ -2,6 +2,7 @@ package niuhe
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"reflect"
 	"regexp"
@@ -16,6 +17,14 @@ const (
 	GET_POST   int  = 3
 	abortIndex int8 = math.MaxInt8 / 2
 )
+
+type Injector = func(*Context, interface{}) (interface{}, error)
+
+var globalInjectors = map[reflect.Type]Injector{}
+
+func RegisterInjector(t reflect.Type, injector Injector) {
+	globalInjectors[t] = injector
+}
 
 type HandlerFunc func(*Context)
 
@@ -122,7 +131,15 @@ func (mod *Module) RegisterWithProtocolFactory(group interface{}, pf IApiProtoco
 	return mod
 }
 
-func getApiGinFunc(groupValue, funcValue reflect.Value, reqType, rspType reflect.Type, pf IApiProtocolFactory, middlewares []HandlerFunc) gin.HandlerFunc {
+func getApiGinFunc(groupValue reflect.Value, path string, funcValue reflect.Value, reqType, rspType reflect.Type, injectTypes []reflect.Type, pf IApiProtocolFactory, middlewares []HandlerFunc) gin.HandlerFunc {
+	injectors := make([]Injector, len(injectTypes))
+	for i, t := range injectTypes {
+		injector := globalInjectors[t]
+		if injector == nil {
+			panic(fmt.Sprintf("getApiGinFunc失败! path %s 找不到%+v类型的依赖注入器", path, t))
+		}
+		injectors[i] = injector
+	}
 	return func(c *gin.Context) {
 		context := newContext(c, middlewares)
 		context.handlers = append(context.handlers, func(c *Context) {
@@ -138,13 +155,24 @@ func getApiGinFunc(groupValue, funcValue reflect.Value, reqType, rspType reflect
 			if readErr := protocol.Read(context, req); readErr != nil {
 				ierr = readErr
 			} else {
-				outs := funcValue.Call([]reflect.Value{
+				args := []reflect.Value{
 					groupValue,
 					reflect.ValueOf(context),
 					req,
 					rsp,
-				})
-				ierr = outs[0].Interface()
+				}
+				for _, injector := range injectors {
+					if injectValue, err := injector(context, req.Interface()); err != nil {
+						ierr = err
+						break
+					} else {
+						args = append(args, reflect.ValueOf(injectValue))
+					}
+				}
+				if ierr == nil {
+					outs := funcValue.Call(args)
+					ierr = outs[0].Interface()
+				}
 			}
 			var rspErr error
 			if ierr != nil {
@@ -185,9 +213,10 @@ func getGinFunc(
 		panic("handleFunc必须为函数")
 	}
 	var isApi bool
-	if funcType.NumIn() == 4 && funcType.NumOut() == 1 {
+	numIn := funcType.NumIn()
+	if numIn >= 4 && funcType.NumOut() == 1 {
 		isApi = true
-	} else if funcType.NumIn() == 2 && funcType.NumOut() == 0 {
+	} else if numIn == 2 && funcType.NumOut() == 0 {
 		isApi = false
 	} else {
 		panic("handleFunc必须有一个（*niuhe.Context)或三个(*niuhe.Context, *ReqMsg, *RspMsg)参数,并且只返回一个error")
@@ -195,7 +224,11 @@ func getGinFunc(
 	if isApi {
 		reqType := funcType.In(2).Elem()
 		rspType := funcType.In(3).Elem()
-		ginHandler = getApiGinFunc(groupValue, funcValue, reqType, rspType, pf, middlewares)
+		injectTypes := make([]reflect.Type, numIn-4)
+		for i := 4; i < numIn; i++ {
+			injectTypes[i-4] = funcType.In(i)
+		}
+		ginHandler = getApiGinFunc(groupValue, path, funcValue, reqType, rspType, injectTypes, pf, middlewares)
 	} else {
 		ginHandler = getWebGinFunc(groupValue, funcValue, middlewares)
 	}
