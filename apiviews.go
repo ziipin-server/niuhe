@@ -3,6 +3,7 @@ package niuhe
 import (
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"reflect"
 	"regexp"
@@ -139,6 +140,22 @@ type DisposableHolder struct {
 	Disposer func()
 }
 
+type NoErrorCloser interface {
+	Close()
+}
+
+func makeNoErrorCloserDisposer(v NoErrorCloser) func() {
+	return func() {
+		v.Close()
+	}
+}
+
+func makeIOCloserDisposer(v io.Closer) func() {
+	return func() {
+		v.Close()
+	}
+}
+
 func getApiGinFunc(groupValue reflect.Value, path string, funcValue reflect.Value, reqType, rspType reflect.Type, injectTypes []reflect.Type, pf IApiProtocolFactory, middlewares []HandlerFunc) gin.HandlerFunc {
 	injectors := make([]Injector, len(injectTypes))
 	for i, t := range injectTypes {
@@ -184,6 +201,12 @@ func getApiGinFunc(groupValue reflect.Value, path string, funcValue reflect.Valu
 						case DisposableHolder:
 							disposers = append(disposers, iv.Disposer)
 							args = append(args, reflect.ValueOf(iv.Value))
+						case NoErrorCloser:
+							disposers = append(disposers, makeNoErrorCloserDisposer(iv))
+							args = append(args, reflect.ValueOf(iv))
+						case io.Closer:
+							disposers = append(disposers, makeIOCloserDisposer(iv))
+							args = append(args, reflect.ValueOf(iv))
 						default:
 							args = append(args, reflect.ValueOf(injectValue))
 						}
