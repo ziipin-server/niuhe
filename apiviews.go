@@ -163,10 +163,10 @@ func getApiGinFunc(groupValue reflect.Value, path string, funcValue reflect.Valu
 			if readErr := protocol.Read(context, req); readErr != nil {
 				ierr = readErr
 			} else {
-				diposers := []func(){}
+				disposers := []func(){}
 				defer func() {
-					for _, disposer := range diposers {
-						disposer()
+					for i := len(disposers) - 1; i >= 0; i-- {
+						disposers[i]()
 					}
 				}()
 				args := []reflect.Value{
@@ -182,7 +182,7 @@ func getApiGinFunc(groupValue reflect.Value, path string, funcValue reflect.Valu
 					} else {
 						switch iv := injectValue.(type) {
 						case DisposableHolder:
-							diposers = append(diposers, iv.Disposer)
+							disposers = append(disposers, iv.Disposer)
 							args = append(args, reflect.ValueOf(iv.Value))
 						default:
 							args = append(args, reflect.ValueOf(injectValue))
