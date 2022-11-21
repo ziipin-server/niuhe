@@ -5,6 +5,8 @@ import (
 	"io"
 	"log"
 	"os"
+
+	"github.com/petermattis/goid"
 )
 
 const (
@@ -79,11 +81,12 @@ func (l *LoggerT) log(level int, calldepth int, format string, args ...interface
 		return false
 	}
 	logger := l.loggers[level]
+	gidPrefix := fmt.Sprintf("[GID:%d] ", goid.Get())
 	var content = format
 	if len(args) > 0 {
 		content = fmt.Sprintf(format, args...)
 	}
-	logger.Output(calldepth, content)
+	logger.Output(calldepth, gidPrefix+content)
 	switch level {
 	case LOG_DEBUG:
 		for _, cb := range l.callbacks.debug {
