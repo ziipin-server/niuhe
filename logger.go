@@ -31,6 +31,8 @@ type LoggerT struct {
 		assert []func(string)
 		fatal  []func(string)
 	}
+	prefixPlugins []func() string
+	suffixPlugins []func() string
 }
 
 var defaultLogger *LoggerT
@@ -76,6 +78,28 @@ func (l *LoggerT) SetLogLevel(logLevel int) {
 	l.minLevel = logLevel
 }
 
+func (l *LoggerT) getPlgPrefix() (r string) {
+	if nil == l.prefixPlugins {
+		return
+	}
+	for _, func1 := range l.prefixPlugins {
+		s := func1()
+		r += s
+	}
+	return
+}
+
+func (l *LoggerT) getPlgSuffix() (r string) {
+	if nil == l.suffixPlugins {
+		return
+	}
+	for _, func1 := range l.suffixPlugins {
+		s := func1()
+		r += s
+	}
+	return
+}
+
 func (l *LoggerT) log(level int, calldepth int, format string, args ...interface{}) bool {
 	if level < l.minLevel || level >= end_log_level {
 		return false
@@ -86,31 +110,34 @@ func (l *LoggerT) log(level int, calldepth int, format string, args ...interface
 	if len(args) > 0 {
 		content = fmt.Sprintf(format, args...)
 	}
-	logger.Output(calldepth, gidPrefix+content)
+	plgPrefix := l.getPlgPrefix()
+	plgSuffix := l.getPlgSuffix()
+	finalContent := plgPrefix + gidPrefix + content + plgSuffix
+	logger.Output(calldepth, finalContent)
 	switch level {
 	case LOG_DEBUG:
 		for _, cb := range l.callbacks.debug {
-			cb(content)
+			cb(finalContent)
 		}
 	case LOG_INFO:
 		for _, cb := range l.callbacks.info {
-			cb(content)
+			cb(finalContent)
 		}
 	case LOG_WARN:
 		for _, cb := range l.callbacks.warn {
-			cb(content)
+			cb(finalContent)
 		}
 	case LOG_ERROR:
 		for _, cb := range l.callbacks.error {
-			cb(content)
+			cb(finalContent)
 		}
 	case LOG_ASSERT:
 		for _, cb := range l.callbacks.assert {
-			cb(content)
+			cb(finalContent)
 		}
 	case LOG_FATAL:
 		for _, cb := range l.callbacks.fatal {
-			cb(content)
+			cb(finalContent)
 		}
 	}
 	return true
@@ -165,7 +192,7 @@ func (l *LoggerT) FatalUp(up int, format string, args ...interface{}) bool {
 	return l.log(LOG_FATAL, 3+up, format, args...)
 }
 
-//Logger export default looger
+// Logger export default looger
 func Logger() *LoggerT {
 	return defaultLogger
 }
@@ -185,6 +212,14 @@ func (l *LoggerT) AddCallback(level int, callbackFunc func(string)) {
 	case LOG_FATAL:
 		l.callbacks.fatal = append(l.callbacks.fatal, callbackFunc)
 	}
+}
+
+func (l *LoggerT) AddPrefixPlugin(prefixPlg func() string) {
+	l.prefixPlugins = append(l.prefixPlugins, prefixPlg)
+}
+
+func (l *LoggerT) AddSuffixPlugin(suffixPlg func() string) {
+	l.suffixPlugins = append(l.suffixPlugins, suffixPlg)
 }
 
 func SetLogLevel(logLevel int) {
@@ -217,6 +252,14 @@ func LogFatal(format string, args ...interface{}) bool {
 
 func AddLogCallback(level int, callback func(string)) {
 	defaultLogger.AddCallback(level, callback)
+}
+
+func AddLogPrefixPlugin(prefixPlg func() string) {
+	defaultLogger.AddPrefixPlugin(prefixPlg)
+}
+
+func AddLogSuffixPlugin(suffixPlg func() string) {
+	defaultLogger.AddSuffixPlugin(suffixPlg)
 }
 
 func init() {
