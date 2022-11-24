@@ -5,8 +5,6 @@ import (
 	"io"
 	"log"
 	"os"
-
-	"github.com/petermattis/goid"
 )
 
 const (
@@ -31,6 +29,7 @@ type LoggerT struct {
 		assert []func(string)
 		fatal  []func(string)
 	}
+	plugin func(string) string // replacement plugin
 }
 
 var defaultLogger *LoggerT
@@ -81,12 +80,16 @@ func (l *LoggerT) log(level int, calldepth int, format string, args ...interface
 		return false
 	}
 	logger := l.loggers[level]
-	gidPrefix := fmt.Sprintf("[GID:%d] ", goid.Get())
 	var content = format
 	if len(args) > 0 {
 		content = fmt.Sprintf(format, args...)
 	}
-	logger.Output(calldepth, gidPrefix+content)
+
+	if nil != l.plugin {
+		content = l.plugin(content)
+	}
+
+	logger.Output(calldepth, content)
 	switch level {
 	case LOG_DEBUG:
 		for _, cb := range l.callbacks.debug {
@@ -165,7 +168,7 @@ func (l *LoggerT) FatalUp(up int, format string, args ...interface{}) bool {
 	return l.log(LOG_FATAL, 3+up, format, args...)
 }
 
-//Logger export default looger
+// Logger export default looger
 func Logger() *LoggerT {
 	return defaultLogger
 }
@@ -185,6 +188,10 @@ func (l *LoggerT) AddCallback(level int, callbackFunc func(string)) {
 	case LOG_FATAL:
 		l.callbacks.fatal = append(l.callbacks.fatal, callbackFunc)
 	}
+}
+
+func (l *LoggerT) SetPlugin(plugin func(string) string) {
+	l.plugin = plugin
 }
 
 func SetLogLevel(logLevel int) {
@@ -217,6 +224,10 @@ func LogFatal(format string, args ...interface{}) bool {
 
 func AddLogCallback(level int, callback func(string)) {
 	defaultLogger.AddCallback(level, callback)
+}
+
+func SetLogPlugin(plugin func(string) string) {
+	defaultLogger.SetPlugin(plugin)
 }
 
 func init() {
