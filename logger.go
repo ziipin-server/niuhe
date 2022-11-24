@@ -5,8 +5,6 @@ import (
 	"io"
 	"log"
 	"os"
-
-	"github.com/petermattis/goid"
 )
 
 const (
@@ -31,8 +29,7 @@ type LoggerT struct {
 		assert []func(string)
 		fatal  []func(string)
 	}
-	prefixPlugins []func() string
-	suffixPlugins []func() string
+	plugin func(string) string // replacement plugin
 }
 
 var defaultLogger *LoggerT
@@ -78,66 +75,45 @@ func (l *LoggerT) SetLogLevel(logLevel int) {
 	l.minLevel = logLevel
 }
 
-func (l *LoggerT) getPlgPrefix() (r string) {
-	if nil == l.prefixPlugins {
-		return
-	}
-	for _, func1 := range l.prefixPlugins {
-		s := func1()
-		r += s
-	}
-	return
-}
-
-func (l *LoggerT) getPlgSuffix() (r string) {
-	if nil == l.suffixPlugins {
-		return
-	}
-	for _, func1 := range l.suffixPlugins {
-		s := func1()
-		r += s
-	}
-	return
-}
-
 func (l *LoggerT) log(level int, calldepth int, format string, args ...interface{}) bool {
 	if level < l.minLevel || level >= end_log_level {
 		return false
 	}
 	logger := l.loggers[level]
-	gidPrefix := fmt.Sprintf("[GID:%d] ", goid.Get())
 	var content = format
 	if len(args) > 0 {
 		content = fmt.Sprintf(format, args...)
 	}
-	plgPrefix := l.getPlgPrefix()
-	plgSuffix := l.getPlgSuffix()
-	finalContent := plgPrefix + gidPrefix + content + plgSuffix
-	logger.Output(calldepth, finalContent)
+
+	if nil != l.plugin {
+		content = l.plugin(content)
+	}
+
+	logger.Output(calldepth, content)
 	switch level {
 	case LOG_DEBUG:
 		for _, cb := range l.callbacks.debug {
-			cb(finalContent)
+			cb(content)
 		}
 	case LOG_INFO:
 		for _, cb := range l.callbacks.info {
-			cb(finalContent)
+			cb(content)
 		}
 	case LOG_WARN:
 		for _, cb := range l.callbacks.warn {
-			cb(finalContent)
+			cb(content)
 		}
 	case LOG_ERROR:
 		for _, cb := range l.callbacks.error {
-			cb(finalContent)
+			cb(content)
 		}
 	case LOG_ASSERT:
 		for _, cb := range l.callbacks.assert {
-			cb(finalContent)
+			cb(content)
 		}
 	case LOG_FATAL:
 		for _, cb := range l.callbacks.fatal {
-			cb(finalContent)
+			cb(content)
 		}
 	}
 	return true
@@ -214,12 +190,8 @@ func (l *LoggerT) AddCallback(level int, callbackFunc func(string)) {
 	}
 }
 
-func (l *LoggerT) AddPrefixPlugin(prefixPlg func() string) {
-	l.prefixPlugins = append(l.prefixPlugins, prefixPlg)
-}
-
-func (l *LoggerT) AddSuffixPlugin(suffixPlg func() string) {
-	l.suffixPlugins = append(l.suffixPlugins, suffixPlg)
+func (l *LoggerT) SetPlugin(plugin func(string) string) {
+	l.plugin = plugin
 }
 
 func SetLogLevel(logLevel int) {
@@ -254,12 +226,8 @@ func AddLogCallback(level int, callback func(string)) {
 	defaultLogger.AddCallback(level, callback)
 }
 
-func AddLogPrefixPlugin(prefixPlg func() string) {
-	defaultLogger.AddPrefixPlugin(prefixPlg)
-}
-
-func AddLogSuffixPlugin(suffixPlg func() string) {
-	defaultLogger.AddSuffixPlugin(suffixPlg)
+func SetLogPlugin(plugin func(string) string) {
+	defaultLogger.SetPlugin(plugin)
 }
 
 func init() {
