@@ -10,12 +10,13 @@ import (
 )
 
 type Server struct {
-	PathPrefix       string
-	engine           *gin.Engine
-	modules          []*Module
-	middlewares      []gin.HandlerFunc
-	niuheMiddlewares []HandlerFunc
-	staticPaths      []staticPath
+	PathPrefix         string
+	engine             *gin.Engine
+	modules            []*Module
+	middlewares        []gin.HandlerFunc
+	niuheMiddlewares   []HandlerFunc
+	staticPaths        []staticPath
+	customLogFormatter func(param gin.LogFormatterParams) string
 }
 
 func NewServer() *Server {
@@ -73,13 +74,46 @@ func (svr *Server) Static(relativePath, root string) {
 	svr.staticPaths = append(svr.staticPaths, staticPath{relativePath, root})
 }
 
-func (svr *Server) GetGinEngine() *gin.Engine {
+func (svr *Server) SetCustomLogFormatter(formatter func(gin.LogFormatterParams) string) {
+	svr.customLogFormatter = formatter
+}
+
+func (svr *Server) logFormatter(param gin.LogFormatterParams) string {
+	if svr.customLogFormatter != nil {
+		return svr.customLogFormatter(param)
+	}
+	var statusColor, methodColor, resetColor string
+	if param.IsOutputColor() {
+		statusColor = param.StatusCodeColor()
+		methodColor = param.MethodColor()
+		resetColor = param.ResetColor()
+	}
+
+	if param.Latency > time.Minute {
+		param.Latency = param.Latency.Truncate(time.Second)
+	}
+	return fmt.Sprintf("[GIN] %v |%s %3d %s| %13v | %15s |%s %-7s %s %#v\n%s",
+		param.TimeStamp.Format("2006/01/02 - 15:04:05"),
+		statusColor, param.StatusCode, resetColor,
+		param.Latency,
+		param.ClientIP,
+		methodColor, param.Method, resetColor,
+		param.Path,
+		param.ErrorMessage,
+	)
+}
+
+func (svr *Server) GetGinEngine(loggerConfig ...gin.LoggerConfig) *gin.Engine {
 	if svr.engine == nil {
 		svr.engine = gin.New()
 		for _, sp := range svr.staticPaths {
 			svr.engine.Static(sp.relativePath, sp.root)
 		}
-		svr.engine.Use(gin.LoggerWithWriter(os.Stderr), gin.Recovery()).
+		loggerConfig := gin.LoggerConfig{
+			Formatter: svr.logFormatter,
+			Output:    os.Stderr,
+		}
+		svr.engine.Use(gin.LoggerWithConfig(loggerConfig), gin.Recovery()).
 			Use(svr.middlewares...)
 		for _, mod := range svr.modules {
 			group := svr.engine.Group(svr.PathPrefix + mod.urlPrefix)
