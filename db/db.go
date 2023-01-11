@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/go-sql-driver/mysql"
 	"github.com/go-xorm/xorm"
 )
 
@@ -17,6 +18,7 @@ type DB struct {
 	masterOnce   sync.Once
 	slaveOnce    sync.Once
 	txLevel      int
+	txFailed     bool
 }
 
 func NewDB(engine *xorm.Engine) *DB {
@@ -35,6 +37,7 @@ func NewDBWithSlaves(masterEngine *xorm.Engine, slaveEngines []*xorm.Engine) *DB
 func (db *DB) GetMasterDB() *xorm.Session {
 	db.masterOnce.Do(func() {
 		db.session = db.engine.NewSession()
+		db.txFailed = false
 	})
 	return db.session
 }
@@ -78,13 +81,13 @@ func (db *DB) Atom(fn func() error) error {
 		defer db.lock.Unlock()
 		db.txLevel--
 		if db.txLevel > 0 {
-			if err != nil || hasPanic {
+			if err != nil || hasPanic || db.txFailed {
 				_, dberr = session.Exec("ROLLBACK TO SP_" + strconv.Itoa(db.txLevel))
 			} else {
 				_, dberr = session.Exec("RELEASE SAVEPOINT SP_" + strconv.Itoa(db.txLevel))
 			}
 		} else {
-			if err != nil || hasPanic {
+			if err != nil || hasPanic || db.txFailed {
 				dberr = session.Rollback()
 			} else {
 				dberr = session.Commit()
@@ -92,12 +95,24 @@ func (db *DB) Atom(fn func() error) error {
 			session.Close()
 			db.session = nil
 			db.masterOnce = sync.Once{}
+			db.txFailed = false
 		}
 		if dberr != nil {
 			panic(dberr)
 		}
 	}()
 	err = fn()
+	if err != nil {
+		switch ferr := err.(type) {
+		case *mysql.MySQLError:
+			switch ferr.Number {
+			case 1205: // [MYSQLError] 1205 - Error 1205: Lock wait timeout exceeded; try restarting transaction
+				fallthrough
+			case 1213: // [MYSQLError] 1213 - Error 1213: Deadlock found when trying to get lock; try restarting transaction
+				db.txFailed = true
+			}
+		}
+	}
 	hasPanic = false
 	return err
 
