@@ -1,6 +1,8 @@
 package db
 
 import (
+	"context"
+	"errors"
 	"math/rand"
 	"strconv"
 	"sync"
@@ -69,7 +71,11 @@ func (db *DB) Atom(fn func() error) error {
 	}
 	if dberr != nil {
 		db.lock.Unlock()
-		panic(dberr)
+		if errors.Is(dberr, context.Canceled) {
+			return dberr
+		} else {
+			panic(dberr)
+		}
 	}
 	db.txLevel++
 	db.lock.Unlock()
@@ -97,7 +103,7 @@ func (db *DB) Atom(fn func() error) error {
 			db.masterOnce = sync.Once{}
 			db.txFailed = false
 		}
-		if dberr != nil {
+		if dberr != nil && !errors.Is(dberr, context.Canceled) {
 			panic(dberr)
 		}
 	}()
