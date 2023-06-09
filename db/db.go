@@ -161,11 +161,11 @@ func (db *DB) Atom(fn func() error, ctx ...context.Context) error {
 
 }
 
-func (db *DB) Close() {
+func (db *DB) Close() (err error) {
 	if db.session != nil {
 		db.lock.Lock()
 		if db.session != nil {
-			db.session.Close()
+			err = db.session.Close()
 		}
 		db.session = nil
 		db.lock.Unlock()
@@ -173,8 +173,9 @@ func (db *DB) Close() {
 	if db.slaveSession != nil {
 		db.lock.Lock()
 		if db.slaveSession != nil {
-			db.slaveSession.Close()
+			err = db.slaveSession.Close()
 		}
 		db.lock.Unlock()
 	}
+	return
 }
