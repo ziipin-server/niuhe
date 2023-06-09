@@ -10,9 +10,10 @@ import (
 	"sync"
 
 	"database/sql"
+
 	"github.com/go-sql-driver/mysql"
-	"github.com/go-xorm/xorm"
 	"github.com/ziipin-server/niuhe"
+	"xorm.io/xorm"
 )
 
 type DB struct {
