@@ -168,6 +168,10 @@ func (l *LoggerT) FatalUp(up int, format string, args ...interface{}) bool {
 	return l.log(LOG_FATAL, 3+up, format, args...)
 }
 
+func (l *LoggerT) logLevel() int {
+	return l.minLevel
+}
+
 // Logger export default looger
 func Logger() *LoggerT {
 	return defaultLogger
@@ -192,6 +196,10 @@ func (l *LoggerT) AddCallback(level int, callbackFunc func(string)) {
 
 func (l *LoggerT) SetPlugin(plugin func(string) string) {
 	l.plugin = plugin
+}
+
+func LogLevel() int {
+	return defaultLogger.minLevel
 }
 
 func SetLogLevel(logLevel int) {
