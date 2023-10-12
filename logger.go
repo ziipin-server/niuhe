@@ -198,9 +198,10 @@ func (l *LoggerT) SetPlugin(plugin func(string) string) {
 	l.plugin = plugin
 }
 
-func logLevel() int {
+func LogLevel() int {
 	return defaultLogger.minLevel
 }
+
 func SetLogLevel(logLevel int) {
 	defaultLogger.SetLogLevel(logLevel)
 }
