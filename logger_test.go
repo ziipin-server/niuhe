@@ -27,6 +27,13 @@ func TestNewLogger(t *testing.T) {
 	AddLogCallback(LOG_ERROR, func(msg string) {
 		fmt.Println("LOG_ERROR", msg)
 	})
+	SetLogLevelHook(func(level int, f string) int {
+		if level == LOG_INFO && f == "2" {
+			fmt.Println("hooking info 2, change level into ERR")
+			return LOG_ERROR
+		}
+		return level
+	})
 	SetLogLevel(LOG_WARN)
 	LogDebug("1")
 	LogInfo("2")

@@ -29,7 +29,8 @@ type LoggerT struct {
 		assert []func(string)
 		fatal  []func(string)
 	}
-	plugin func(string) string // replacement plugin
+	levelHook func(level int, content string) (newLevel int)
+	plugin    func(string) string // replacement plugin
 }
 
 var defaultLogger *LoggerT
@@ -76,6 +77,9 @@ func (l *LoggerT) SetLogLevel(logLevel int) {
 }
 
 func (l *LoggerT) log(level int, calldepth int, format string, args ...interface{}) bool {
+	if l.levelHook != nil {
+		level = l.levelHook(level, format)
+	}
 	if level < l.minLevel || level >= end_log_level {
 		return false
 	}
@@ -198,6 +202,10 @@ func (l *LoggerT) SetPlugin(plugin func(string) string) {
 	l.plugin = plugin
 }
 
+func (l *LoggerT) SetLevelHook(f func(int, string) int) {
+	l.levelHook = f
+}
+
 func LogLevel() int {
 	return defaultLogger.minLevel
 }
@@ -236,6 +244,10 @@ func AddLogCallback(level int, callback func(string)) {
 
 func SetLogPlugin(plugin func(string) string) {
 	defaultLogger.SetPlugin(plugin)
+}
+
+func SetLogLevelHook(h func(int, string) int) {
+	defaultLogger.SetLevelHook(h)
 }
 
 func init() {
