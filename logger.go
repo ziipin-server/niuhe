@@ -18,6 +18,8 @@ const (
 	DEFAULT_LOG_FLAGS = log.Ldate | log.Ltime | log.Lshortfile
 )
 
+type LogPreHookType = func(level int, format string, args []any) (newLevel int, newFormat string, newArgs []any)
+
 type LoggerT struct {
 	minLevel  int
 	loggers   []*log.Logger
@@ -29,8 +31,8 @@ type LoggerT struct {
 		assert []func(string)
 		fatal  []func(string)
 	}
-	levelHook func(level int, content string) (newLevel int)
-	plugin    func(string) string // replacement plugin
+	preHook LogPreHookType
+	plugin  func(string) string // replacement plugin
 }
 
 var defaultLogger *LoggerT
@@ -77,8 +79,8 @@ func (l *LoggerT) SetLogLevel(logLevel int) {
 }
 
 func (l *LoggerT) log(level int, calldepth int, format string, args ...interface{}) bool {
-	if l.levelHook != nil {
-		level = l.levelHook(level, format)
+	if l.preHook != nil {
+		level, format, args = l.preHook(level, format, args)
 	}
 	if level < l.minLevel || level >= end_log_level {
 		return false
@@ -202,8 +204,8 @@ func (l *LoggerT) SetPlugin(plugin func(string) string) {
 	l.plugin = plugin
 }
 
-func (l *LoggerT) SetLevelHook(f func(int, string) int) {
-	l.levelHook = f
+func (l *LoggerT) SetPreHook(f LogPreHookType) {
+	l.preHook = f
 }
 
 func LogLevel() int {
@@ -246,8 +248,8 @@ func SetLogPlugin(plugin func(string) string) {
 	defaultLogger.SetPlugin(plugin)
 }
 
-func SetLogLevelHook(h func(int, string) int) {
-	defaultLogger.SetLevelHook(h)
+func SetLogPreHook(h LogPreHookType) {
+	defaultLogger.SetPreHook(h)
 }
 
 func init() {
