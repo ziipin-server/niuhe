@@ -18,7 +18,7 @@ const (
 	DEFAULT_LOG_FLAGS = log.Ldate | log.Ltime | log.Lshortfile
 )
 
-type LogPreHookType = func(level int, format string, args []any) (newLevel int, newFormat string, newArgs []any)
+type LogPreHookType = func(level int, format string, args []interface{}) (newLevel int, newFormat string, newArgs []interface{})
 
 type LoggerT struct {
 	minLevel  int
