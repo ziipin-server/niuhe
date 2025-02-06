@@ -2,8 +2,8 @@ package niuhe
 
 import (
 	"fmt"
-	"testing"
 	"os"
+	"testing"
 )
 
 func TestSimpleLog(t *testing.T) {
@@ -26,6 +26,13 @@ func TestSetLogLevel(t *testing.T) {
 func TestNewLogger(t *testing.T) {
 	AddLogCallback(LOG_ERROR, func(msg string) {
 		fmt.Println("LOG_ERROR", msg)
+	})
+	SetLogPreHook(func(level int, f string, args []interface{}) (int, string, []interface{}) {
+		if level == LOG_INFO && f == "2" {
+			fmt.Println(">>>>>>>>> hooking info 2, change level into ERR")
+			return LOG_ERROR, "!!%s!!" + f, append([]interface{}{"lalala"}, args...)
+		}
+		return level, f, args
 	})
 	SetLogLevel(LOG_WARN)
 	LogDebug("1")
