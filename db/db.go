@@ -65,7 +65,7 @@ func (db *DB) GetDB() *xorm.Session {
 	}
 }
 
-func (db *DB) Atom(fn func() error, ctx ...context.Context) error {
+func (db *DB) Atom(fn func() error, ctx ...context.Context) (err error) {
 	var dberr error
 	session := db.GetMasterDB()
 	db.lock.Lock()
@@ -89,7 +89,7 @@ func (db *DB) Atom(fn func() error, ctx ...context.Context) error {
 	db.txLevel++
 	db.lock.Unlock()
 
-	var err error
+	//var err error
 	var fnLastSql, txLastSql string
 	var fnLastSqlParams, txLastSqlParams []interface{}
 	hasPanic := true
@@ -138,6 +138,7 @@ func (db *DB) Atom(fn func() error, ctx ...context.Context) error {
 			niuhe.LogWarn("[TxFail] %s\n", string(buf))
 			if len(ctx) > 0 && errors.Is(ctx[0].Err(), context.Canceled) && errors.Is(dberr, sql.ErrTxDone) {
 				niuhe.LogInfo("[TxWatch] transaction has already been committed or rolled back when context is canceled, err=%v, dberr=%v", err, dberr)
+				err = context.Canceled
 			} else {
 				panic(dberr)
 			}
