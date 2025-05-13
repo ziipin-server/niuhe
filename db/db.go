@@ -138,6 +138,7 @@ func (db *DB) Atom(fn func() error, ctx ...context.Context) error {
 			niuhe.LogWarn("[TxFail] %s\n", string(buf))
 			if len(ctx) > 0 && errors.Is(ctx[0].Err(), context.Canceled) && errors.Is(dberr, sql.ErrTxDone) {
 				niuhe.LogInfo("[TxWatch] transaction has already been committed or rolled back when context is canceled, err=%v, dberr=%v", err, dberr)
+				err = context.Canceled
 			} else {
 				panic(dberr)
 			}
