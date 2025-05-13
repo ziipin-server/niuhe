@@ -65,7 +65,7 @@ func (db *DB) GetDB() *xorm.Session {
 	}
 }
 
-func (db *DB) Atom(fn func() error, ctx ...context.Context) error {
+func (db *DB) Atom(fn func() error, ctx ...context.Context) (err error) {
 	var dberr error
 	session := db.GetMasterDB()
 	db.lock.Lock()
@@ -89,7 +89,7 @@ func (db *DB) Atom(fn func() error, ctx ...context.Context) error {
 	db.txLevel++
 	db.lock.Unlock()
 
-	var err error
+	//var err error
 	var fnLastSql, txLastSql string
 	var fnLastSqlParams, txLastSqlParams []interface{}
 	hasPanic := true
