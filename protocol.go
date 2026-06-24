@@ -1,6 +1,10 @@
 package niuhe
 
 import (
+	"encoding/json"
+	"errors"
+	"io"
+	"net/http"
 	"reflect"
 
 	"github.com/ziipin-server/zpform"
@@ -18,6 +22,14 @@ type IApiProtocol interface {
 type DefaultApiProtocol struct{}
 
 func (self DefaultApiProtocol) Read(c *Context, reqValue reflect.Value) error {
+	switch c.Request.Method {
+	case http.MethodPost:
+		if c.ContentType() == "application/json" {
+			if err := json.NewDecoder(c.Request.Body).Decode(reqValue.Interface()); err != nil && !errors.Is(err, io.EOF) {
+				return NewCommError(-1, err.Error())
+			}
+		}
+	}
 	if err := zpform.ReadReflectedStructForm(c.Request, reqValue); err != nil {
 		return NewCommError(-1, err.Error())
 	}
