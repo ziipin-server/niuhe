@@ -1,6 +1,10 @@
 package niuhe
 
-import "github.com/gin-gonic/gin"
+import (
+	"strings"
+
+	"github.com/gin-gonic/gin"
+)
 
 type Context struct {
 	*gin.Context
@@ -130,4 +134,93 @@ func (c *Context) Data(code int, contentType string, data []byte) {
 func (c *Context) File(filepath string) {
 	c.beforeOutput()
 	c.Context.File(filepath)
+}
+
+// Query returns the keyed url query value if it exists,
+// otherwise it returns an empty string `("")`.
+//
+// It first checks the given key and, if not found and the key does not
+// end with `[]`, it also checks the same key with a `[]` suffix.
+//
+//	GET /path?id=1234&name=Manu&value=
+//	c.Query("id") == "1234"
+//	c.Query("name") == "Manu"
+//	c.Query("value") == ""
+//	c.Query("wtf") == ""
+//
+//	GET /path?tag[]=go&tag[]=gin
+//	c.Query("tag") == "go"
+//	c.Query("tag[]") == "go"
+func (c *Context) Query(key string) (value string) {
+	value, _ = c.GetQuery(key)
+	return
+}
+
+// DefaultQuery returns the keyed url query value if it exists,
+// otherwise it returns the specified defaultValue string.
+// See: Query() and GetQuery() for further information.
+//
+//	GET /?name=Manu&lastname=
+//	c.DefaultQuery("name", "unknown") == "Manu"
+//	c.DefaultQuery("id", "none") == "none"
+//	c.DefaultQuery("lastname", "none") == ""
+//
+//	GET /?tag[]=go
+//	c.DefaultQuery("tag", "none") == "go"
+func (c *Context) DefaultQuery(key, defaultValue string) string {
+	if value, ok := c.GetQuery(key); ok {
+		return value
+	}
+	return defaultValue
+}
+
+// GetQuery is like Query(), it returns the keyed url query value
+// if it exists `(value, true)` (even when the value is an empty string),
+// otherwise it returns `("", false)`.
+//
+// It first checks the given key and, if not found and the key does not
+// end with `[]`, it also checks the same key with a `[]` suffix.
+//
+//	GET /?name=Manu&lastname=
+//	("Manu", true) == c.GetQuery("name")
+//	("", false) == c.GetQuery("id")
+//	("", true) == c.GetQuery("lastname")
+//
+//	GET /?tag[]=go&tag[]=gin
+//	("go", true) == c.GetQuery("tag")
+//	("go", true) == c.GetQuery("tag[]")
+func (c *Context) GetQuery(key string) (string, bool) {
+	if values, ok := c.GetQueryArray(key); ok {
+		return values[0], ok
+	}
+	return "", false
+}
+
+// QueryArray returns a slice of strings for a given query key.
+// The length of the slice depends on the number of params with the given key.
+//
+// It first checks the given key and, if not found and the key does not
+// end with `[]`, it also checks the same key with a `[]` suffix.
+func (c *Context) QueryArray(key string) (values []string) {
+	values, _ = c.GetQueryArray(key)
+	return
+}
+
+// GetQueryArray returns a slice of strings for a given query key, plus
+// a boolean value whether at least one value exists for the given key.
+//
+// It first checks the given key and, if not found and the key does not
+// end with `[]`, it also checks the same key with a `[]` suffix.
+//
+//	GET /?tag=go&tag=gin
+//	([]string{"go", "gin"}, true) == c.GetQueryArray("tag")
+//
+//	GET /?tag[]=go&tag[]=gin
+//	([]string{"go", "gin"}, true) == c.GetQueryArray("tag")
+//	([]string{"go", "gin"}, true) == c.GetQueryArray("tag[]")
+func (c *Context) GetQueryArray(key string) (values []string, ok bool) {
+	if values, ok = c.Context.GetQueryArray(key); ok || strings.HasSuffix(key, "[]") {
+		return
+	}
+	return c.Context.GetQueryArray(key + "[]")
 }
