@@ -100,7 +100,7 @@ type _ICanYAML interface {
 }
 
 func (c *Context) YAML(code int, obj interface{}) {
-	if ctx, ok := interface{}(c.Context).(_ICanYAML); !ok {
+	if ctx, ok := interface{}(c.Context).(_ICanYAML); ok {
 		c.beforeOutput()
 		ctx.YAML(code, obj)
 	} else {
