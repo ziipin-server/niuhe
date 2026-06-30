@@ -8,7 +8,7 @@ require (
 	github.com/gorilla/securecookie v1.1.1
 	github.com/gorilla/sessions v1.2.1
 	github.com/ziipin-server/zpform v1.0.0
-	xorm.io/xorm v1.3.2
+	xorm.io/xorm v1.3.3
 )
 
 require (
