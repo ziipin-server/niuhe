@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"strconv"
 	"sync"
+	"time"
 
 	"database/sql"
 
@@ -15,6 +16,28 @@ import (
 	"github.com/ziipin-server/niuhe"
 	"xorm.io/xorm"
 )
+
+// PoolConfig holds connection pool parameters for the database engines.
+type PoolConfig struct {
+	MaxOpenConns    int
+	MaxIdleConns    int
+	ConnMaxLifetime time.Duration
+}
+
+// DefaultPoolConfig returns the recommended default pool configuration.
+func DefaultPoolConfig() PoolConfig {
+	return PoolConfig{
+		MaxOpenConns:    25,
+		MaxIdleConns:    10,
+		ConnMaxLifetime: 30 * time.Minute,
+	}
+}
+
+func applyPoolConfig(engine *xorm.Engine, cfg PoolConfig) {
+	engine.SetMaxOpenConns(cfg.MaxOpenConns)
+	engine.SetMaxIdleConns(cfg.MaxIdleConns)
+	engine.SetConnMaxLifetime(cfg.ConnMaxLifetime)
+}
 
 type DB struct {
 	engine       *xorm.Engine
@@ -29,15 +52,38 @@ type DB struct {
 }
 
 func NewDB(engine *xorm.Engine) *DB {
+	return NewDBWithPoolConfig(engine, DefaultPoolConfig())
+}
+
+// NewDBWithPoolConfig creates a DB instance with custom pool configuration.
+func NewDBWithPoolConfig(engine *xorm.Engine, cfg PoolConfig) *DB {
+	applyPoolConfig(engine, cfg)
 	return &DB{
 		engine: engine,
 	}
 }
 
 func NewDBWithSlaves(masterEngine *xorm.Engine, slaveEngines []*xorm.Engine) *DB {
+	return NewDBWithSlavesAndPoolConfig(masterEngine, slaveEngines, DefaultPoolConfig())
+}
+
+// NewDBWithSlavesAndPoolConfig creates a DB instance with master/slave engines and custom pool configuration.
+func NewDBWithSlavesAndPoolConfig(masterEngine *xorm.Engine, slaveEngines []*xorm.Engine, cfg PoolConfig) *DB {
+	applyPoolConfig(masterEngine, cfg)
+	for _, slave := range slaveEngines {
+		applyPoolConfig(slave, cfg)
+	}
 	return &DB{
 		engine:       masterEngine,
 		slaveEngines: slaveEngines,
+	}
+}
+
+// SetPoolConfig applies custom connection pool parameters to all engines at runtime.
+func (db *DB) SetPoolConfig(cfg PoolConfig) {
+	applyPoolConfig(db.engine, cfg)
+	for _, slave := range db.slaveEngines {
+		applyPoolConfig(slave, cfg)
 	}
 }
 
@@ -76,15 +122,7 @@ func (db *DB) Atom(fn func() error, ctx ...context.Context) (err error) {
 	}
 	if dberr != nil {
 		db.lock.Unlock()
-		if errors.Is(dberr, context.Canceled) {
-			return dberr
-		} else {
-			// 假如由于context被cancel，由于重复rollback/commit导致的sql.ErrTxDone，不panic
-			if len(ctx) > 0 && errors.Is(ctx[0].Err(), context.Canceled) && errors.Is(dberr, sql.ErrTxDone) {
-				return dberr
-			}
-			panic(dberr)
-		}
+		return dberr
 	}
 	db.txLevel++
 	db.lock.Unlock()
@@ -140,7 +178,9 @@ func (db *DB) Atom(fn func() error, ctx ...context.Context) (err error) {
 				niuhe.LogInfo("[TxWatch] transaction has already been committed or rolled back when context is canceled, err=%v, dberr=%v", err, dberr)
 				err = context.Canceled
 			} else {
-				panic(dberr)
+				if err == nil {
+					err = dberr
+				}
 			}
 		}
 	}()

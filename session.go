@@ -26,7 +26,7 @@ func (sc *_SessCtrl) initOnce(c *Context) *_SessCtrl {
 	sc.getSessionOnce.Do(func() {
 		var err error
 		if sc.Session, err = sc.Store.Get(c.Request, sc.Name); err != nil {
-			panic(err)
+			LogError("[Session] Store.Get error: %v", err)
 		}
 	})
 	return sc
@@ -45,26 +45,41 @@ func (sc *_SessCtrl) Save(c *Context) error {
 
 func (sc *_SessCtrl) MustSave(c *Context) {
 	if err := sc.Save(c); err != nil {
-		panic(err)
+		LogError("[Session] MustSave error: %v", err)
 	}
 }
 
 func (sc *_SessCtrl) Set(c *Context, key string, value interface{}) {
-	sc.initOnce(c).Session.Values[key] = value
+	sc.initOnce(c)
+	if sc.Session == nil {
+		return
+	}
+	sc.Session.Values[key] = value
 	sc.Modified = true
 }
 
 func (sc *_SessCtrl) Get(c *Context, key string) interface{} {
-	return sc.initOnce(c).Session.Values[key]
+	sc.initOnce(c)
+	if sc.Session == nil {
+		return nil
+	}
+	return sc.Session.Values[key]
 }
 
 func (sc *_SessCtrl) Del(c *Context, key string) {
-	delete(sc.initOnce(c).Session.Values, key)
+	sc.initOnce(c)
+	if sc.Session == nil {
+		return
+	}
+	delete(sc.Session.Values, key)
 	sc.Modified = true
 }
 
 func (sc *_SessCtrl) GetOptions(c *Context) *sessions.Options {
 	sc.initOnce(c)
+	if sc.Session == nil {
+		return &sessions.Options{}
+	}
 	if !sc.OptionLoaded {
 		bOpts, _ := sc.Session.Values[__SESSION_OPTIONS_KEY__].([]byte)
 		opts, ok := new(sessions.Options), false
@@ -91,7 +106,11 @@ func (sc *_SessCtrl) SetOptions(c *Context, opts *sessions.Options) {
 		Secure:   opts.Secure,
 		HttpOnly: opts.HttpOnly,
 	}
-	sc.initOnce(c).Session.Options = opts
+	sc.initOnce(c)
+	if sc.Session == nil {
+		return
+	}
+	sc.Session.Options = opts
 	bOpts, _ := json.Marshal(opts)
 	sc.Session.Values[__SESSION_OPTIONS_KEY__] = bOpts
 	sc.Modified = true
