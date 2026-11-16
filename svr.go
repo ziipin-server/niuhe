@@ -1,7 +1,10 @@
 package niuhe
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -17,6 +20,7 @@ type Server struct {
 	niuheMiddlewares   []HandlerFunc
 	staticPaths        []staticPath
 	customLogFormatter func(param gin.LogFormatterParams) string
+	httpServer         *http.Server
 }
 
 func NewServer() *Server {
@@ -61,8 +65,39 @@ func (svr *Server) Serve(addr string) {
 		}()
 		ginEngine.RunUnix(filename)
 	} else {
-		ginEngine.Run(addr)
+		srv := &http.Server{
+			Addr:    addr,
+			Handler: ginEngine.Handler(),
+		}
+		svr.httpServer = srv
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			LogError("[niuhe.Serve] Serve fail:%v", err)
+		}
 	}
+}
+
+// Shutdown gracefully stops the HTTP server by closing listeners and idle
+// keep-alive connections, then waiting for in-flight requests to finish.
+// If graceful shutdown fails, Close forcibly closes remaining TCP connections
+// in StateNew, StateActive, or StateIdle. Hijacked connections must be closed separately.
+func (svr *Server) Shutdown(timeout time.Duration) error {
+	if svr.httpServer == nil {
+		LogInfo("[Shutdown] No HTTP server to shut down")
+		return nil
+	}
+	svr.httpServer.SetKeepAlivesEnabled(false)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	LogInfo("[Shutdown] Starting graceful HTTP shutdown")
+	if err := svr.httpServer.Shutdown(ctx); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		LogError("[Shutdown] HTTP shutdown failed: %v. Forcibly closing remaining connections", err)
+		if closeErr := svr.httpServer.Close(); closeErr != nil {
+			LogError("[Shutdown] Failed to close remaining HTTP connections: %v", closeErr)
+		}
+		return err
+	}
+	LogInfo("[Shutdown] HTTP shutdown complete")
+	return nil
 }
 
 type staticPath struct {
